@@ -33,12 +33,12 @@ export default async function HomePage() {
     <div className="space-y-10">
       {/* Hero */}
       <section className="text-center pt-6 pb-2">
-        <div className="hand text-accent-rose text-2xl">30 anys, 30 anys d&apos;històries</div>
+        <div className="hand text-accent-rose text-2xl">30 anys d&apos;històries</div>
         <h1 className="font-serif text-5xl md:text-6xl leading-tight mt-1">
-          Un àlbum col·lectiu per a l&apos;Eugeni
+          Un àlbum col·lectiu dels moments viscuts amb l&apos;Eugeni
         </h1>
         <p className="text-sepia-500 max-w-2xl mx-auto mt-4">
-          Deixa un record — una foto, un vídeo, una frase. Entre tots dibuixarem
+          Deixa un record — una foto, una descripció i les persones que hi van participar. Entre tots dibuixarem
           tres dècades de viatges, dinars, sopars, riures i moments que ens han
           fet com som.
         </p>
