@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#E8A48C"/>
+      <stop offset="55%" stop-color="#D68B72"/>
+      <stop offset="100%" stop-color="#8F6A3A"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="32" fill="url(#bg)"/>
+  <text
+    x="32"
+    y="34"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-family="Georgia, 'Cormorant Garamond', 'Times New Roman', serif"
+    font-size="40"
+    font-weight="500"
+    fill="#FBF7F0"
+  >E</text>
+</svg>
