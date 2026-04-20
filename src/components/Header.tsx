@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 
 export function Header() {
+  const esAdmin = cookies().get("eugeni_admin")?.value === "ok";
+
   return (
     <header className="sticky top-0 z-30 backdrop-blur bg-cream-50/80 border-b border-cream-200">
       <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
@@ -15,7 +18,12 @@ export function Header() {
         </Link>
 
         <nav className="flex items-center gap-2">
-          <Link href="/" className="ink-btn-outline hidden sm:inline-flex">
+          {esAdmin && (
+            <Link href="/admin" className="ink-btn-outline">
+              Admin
+            </Link>
+          )}
+          <Link href="/" className="ink-btn-outline hidden md:inline-flex">
             Línia del temps
           </Link>
           <Link href="/pujar" className="ink-btn">

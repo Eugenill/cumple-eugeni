@@ -17,7 +17,8 @@ export function UploadForm({ personesSuggerides }: Props) {
   const [novaPersona, setNovaPersona] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [okId, setOkId] = useState<string | null>(null);
+  const [ok, setOk] = useState<{ id: string; editUrl: string } | null>(null);
+  const [copiat, setCopiat] = useState(false);
 
   function afegirPersona(nom: string) {
     const n = nom.trim();
@@ -57,11 +58,8 @@ export function UploadForm({ personesSuggerides }: Props) {
       const res = await fetch("/api/moments", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Error al pujar");
-      setOkId(data.id);
-      setTimeout(() => {
-        router.push("/");
-        router.refresh();
-      }, 1200);
+      const editUrl = `${window.location.origin}/record/${data.id}/editar?codi=${data.edit_token}`;
+      setOk({ id: data.id, editUrl });
     } catch (err: any) {
       setError(err.message || "Error inesperat");
     } finally {
@@ -69,14 +67,55 @@ export function UploadForm({ personesSuggerides }: Props) {
     }
   }
 
-  if (okId) {
+  async function copiarEnllac() {
+    if (!ok) return;
+    try {
+      await navigator.clipboard.writeText(ok.editUrl);
+      setCopiat(true);
+      setTimeout(() => setCopiat(false), 2000);
+    } catch {
+      // noop
+    }
+  }
+
+  if (ok) {
     return (
-      <div className="card p-10 text-center">
-        <div className="hand text-3xl text-accent-rose">gràcies ♥</div>
-        <h2 className="font-serif text-3xl mt-2">Record afegit!</h2>
-        <p className="text-sepia-500 mt-2">
-          Tornant a la línia del temps…
-        </p>
+      <div className="card p-8 md:p-10">
+        <div className="text-center">
+          <div className="hand text-3xl text-accent-rose">gràcies ♥</div>
+          <h2 className="font-serif text-3xl mt-2">Record afegit!</h2>
+        </div>
+
+        <div className="mt-6 bg-cream-100 border border-cream-200 rounded-xl p-5">
+          <div className="font-serif text-xl text-sepia-700">
+            Guarda aquest enllaç
+          </div>
+          <p className="text-sepia-500 text-sm mt-1">
+            És el teu enllaç privat per <strong>editar</strong> o{" "}
+            <strong>esborrar</strong> aquest record més endavant. Només
+            funciona per al record que acabes de pujar. Si el perds, ningú
+            (tret de l&apos;Eugeni) podrà modificar-lo.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              readOnly
+              value={ok.editUrl}
+              className="input font-mono text-xs"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <button type="button" onClick={copiarEnllac} className="ink-btn-outline whitespace-nowrap">
+              {copiat ? "Copiat ✓" : "Copiar"}
+            </button>
+          </div>
+          <div className="text-xs text-sepia-400 mt-2">
+            Consell: envia&apos;l al teu propi WhatsApp o guarda&apos;l als marcadors.
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 mt-6">
+          <a href="/" className="ink-btn-outline">Veure la línia del temps</a>
+          <a href={ok.editUrl} className="ink-btn">Gestionar aquest record</a>
+        </div>
       </div>
     );
   }

@@ -24,8 +24,13 @@ create table if not exists public.moments (
   descripcio text,
   data_moment date not null,
   pujat_per text,
+  edit_token uuid not null default gen_random_uuid(),
   creat_el timestamptz not null default now()
 );
+
+-- Afegeix edit_token si la taula ja existia sense aquesta columna
+alter table public.moments
+  add column if not exists edit_token uuid not null default gen_random_uuid();
 
 create index if not exists moments_data_idx on public.moments (data_moment desc);
 

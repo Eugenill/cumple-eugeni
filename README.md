@@ -48,7 +48,8 @@ contrasenya que has posat a `SITE_PASSWORD` (per defecte `eugeni30`).
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
-   - `SITE_PASSWORD`
+   - `SITE_PASSWORD` — contrasenya per als convidats
+   - `ADMIN_PASSWORD` — contrasenya mestra (només per a tu)
    - `SUPABASE_BUCKET` *(opcional, per defecte `moments`)*
 4. **Deploy**. En menys d'un minut tindràs una URL tipus
    `https://cumple-eugeni.vercel.app`.
@@ -96,14 +97,27 @@ Cumple Eugeni/
 - **`vista_moments`** — vista agregada que retorna cada moment amb les
   seves persones i mitjans en una sola consulta
 
-## 6. Personalització ràpida
+## 6. Com editar o esborrar un record
+
+**Convidats:** Quan algú puja un record, rep un **enllaç privat** (ex:
+`/record/abc123/editar?codi=xxxxx`). Aquest enllaç només funciona per al
+record que acaba de pujar i li permet editar-lo o esborrar-lo quan vulgui.
+Han de guardar-se l&apos;enllaç (WhatsApp a ells mateixos, marcadors, etc.).
+
+**Administrador (tu):** Si fas login amb `ADMIN_PASSWORD` en comptes de
+`SITE_PASSWORD`, a la capçalera apareix el botó **Admin** que et porta a
+`/admin`, una pàgina amb tots els records i el botó **Gestionar** per a
+cadascun. Pots editar i esborrar qualsevol, encara que el convidat hagi
+perdut el seu enllaç privat.
+
+## 7. Personalització ràpida
 
 - **Paleta**: `tailwind.config.ts` → `colors.cream`, `colors.sepia`, `colors.accent`
 - **Tipografies**: `src/app/globals.css` (per defecte Cormorant Garamond + Inter + Caveat)
 - **Copy**: textos de la portada a `src/app/page.tsx` i `src/app/login/page.tsx`
 - **Contrasenya**: variable `SITE_PASSWORD`
 
-## 7. Idees per més endavant
+## 8. Idees per més endavant
 
 - Reaccions (♥) i comentaris per record
 - Filtre per persona o per any

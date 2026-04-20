@@ -31,11 +31,11 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdminClient();
 
-    // 1. Crear el moment
+    // 1. Crear el moment (edit_token es genera automàticament a la DB)
     const { data: moment, error: momentErr } = await admin
       .from("moments")
       .insert({ titol, descripcio, data_moment, pujat_per })
-      .select()
+      .select("id, edit_token")
       .single();
 
     if (momentErr || !moment) {
@@ -127,7 +127,11 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, id: moment.id });
+    return NextResponse.json({
+      ok: true,
+      id: moment.id,
+      edit_token: moment.edit_token,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message || "Error inesperat" },
