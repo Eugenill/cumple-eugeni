@@ -1,0 +1,92 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&family=Caveat:wght@500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    @apply bg-cream-50 text-sepia-700;
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-image:
+      radial-gradient(at 12% 8%, rgba(201, 123, 99, 0.08) 0px, transparent 50%),
+      radial-gradient(at 90% 10%, rgba(122, 139, 92, 0.08) 0px, transparent 50%),
+      radial-gradient(at 50% 95%, rgba(111, 143, 163, 0.08) 0px, transparent 50%);
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    @apply text-sepia-700;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  .polaroid {
+    @apply bg-white rounded-md shadow-polaroid p-3 pb-10 transition-transform duration-200;
+  }
+
+  .polaroid:hover {
+    transform: translateY(-2px) rotate(-0.5deg);
+  }
+
+  .ink-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 font-medium transition
+           bg-sepia-600 text-cream-50 hover:bg-sepia-700 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .ink-btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 font-medium transition
+           border border-sepia-300 text-sepia-600 hover:bg-cream-100;
+  }
+
+  .card {
+    @apply bg-white/70 backdrop-blur rounded-xl shadow-soft border border-cream-200;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-cream-100 text-sepia-600 text-xs px-2.5 py-1 border border-cream-200;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-sepia-600 mb-1;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-cream-200 bg-white/80 px-3 py-2 text-sepia-700
+           focus:outline-none focus:ring-2 focus:ring-accent-rose/40 focus:border-accent-rose/60;
+  }
+
+  .hand {
+    font-family: "Caveat", cursive;
+  }
+}
+
+/* Timeline rail */
+.rail {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, #D4B98A 10%, #D4B98A 90%, transparent);
+  transform: translateX(-50%);
+}
+
+@media (max-width: 768px) {
+  .rail {
+    left: 1.25rem;
+  }
+}
