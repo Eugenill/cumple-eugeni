@@ -1,17 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useMemo, useRef, useEffect, useState } from "react";
 import { MomentAmbRelacions } from "@/lib/utils";
-
-const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[420px] grid place-items-center text-sepia-400 hand text-xl">
-      Dibuixant les connexions…
-    </div>
-  ),
-});
 
 type Props = {
   moments: MomentAmbRelacions[];
@@ -31,16 +21,17 @@ type Link = {
 
 export function PeopleGraph({ moments }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 600, h: 420 });
+  const [w, setW] = useState(640);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
     const obs = new ResizeObserver((entries) => {
       for (const e of entries) {
-        setSize({ w: e.contentRect.width, h: Math.max(360, Math.min(520, e.contentRect.width * 0.55)) });
+        setW(Math.max(320, e.contentRect.width));
       }
     });
-    obs.observe(containerRef.current);
+    obs.observe(el);
     return () => obs.disconnect();
   }, []);
 
@@ -54,7 +45,6 @@ export function PeopleGraph({ moments }: Props) {
         if (existing) existing.count++;
         else nodeMap.set(p.id, { id: p.id, nom: p.nom, count: 1 });
       }
-      // Crea arestes entre cada parella de persones del mateix moment
       for (let i = 0; i < m.persones.length; i++) {
         for (let j = i + 1; j < m.persones.length; j++) {
           const a = m.persones[i].id;
@@ -62,20 +52,25 @@ export function PeopleGraph({ moments }: Props) {
           const key = a < b ? `${a}|${b}` : `${b}|${a}`;
           const existing = linkMap.get(key);
           if (existing) existing.value++;
-          else linkMap.set(key, { source: a < b ? a : b, target: a < b ? b : a, value: 1 });
+          else
+            linkMap.set(key, {
+              source: a < b ? a : b,
+              target: a < b ? b : a,
+              value: 1,
+            });
         }
       }
     }
 
     return {
-      nodes: Array.from(nodeMap.values()),
+      nodes: Array.from(nodeMap.values()).sort((a, b) => b.count - a.count),
       links: Array.from(linkMap.values()),
     };
   }, [moments]);
 
   if (nodes.length === 0) {
     return (
-      <div className="card p-8 text-center">
+      <div ref={containerRef} className="card p-8 text-center">
         <div className="hand text-accent-rose text-xl">ningú encara…</div>
         <p className="text-sepia-500 mt-1">
           Quan afegiu records amb persones, aquí apareixerà la xarxa.
@@ -84,7 +79,45 @@ export function PeopleGraph({ moments }: Props) {
     );
   }
 
+  const h = Math.max(360, Math.min(520, Math.round(w * 0.55)));
+  const cx = w / 2;
+  const cy = h / 2;
   const maxCount = Math.max(...nodes.map((n) => n.count), 1);
+
+  // Posicions: el node més connectat al centre, la resta en cercle al voltant.
+  const radius = Math.min(w, h) * 0.38;
+  type Pos = { x: number; y: number; r: number; nom: string; count: number };
+  const positions = new Map<string, Pos>();
+
+  const [centre, ...resta] = nodes;
+  positions.set(centre.id, {
+    x: cx,
+    y: cy,
+    r: 14 + (centre.count / maxCount) * 10,
+    nom: centre.nom,
+    count: centre.count,
+  });
+
+  if (resta.length === 1) {
+    positions.set(resta[0].id, {
+      x: cx + radius,
+      y: cy,
+      r: 10 + (resta[0].count / maxCount) * 10,
+      nom: resta[0].nom,
+      count: resta[0].count,
+    });
+  } else {
+    resta.forEach((n, i) => {
+      const angle = (i / resta.length) * Math.PI * 2 - Math.PI / 2;
+      positions.set(n.id, {
+        x: cx + Math.cos(angle) * radius,
+        y: cy + Math.sin(angle) * radius,
+        r: 8 + (n.count / maxCount) * 10,
+        nom: n.nom,
+        count: n.count,
+      });
+    });
+  }
 
   return (
     <div ref={containerRef} className="card overflow-hidden">
@@ -94,41 +127,71 @@ export function PeopleGraph({ moments }: Props) {
           <h3 className="font-serif text-2xl">Xarxa de persones</h3>
         </div>
         <div className="text-xs text-sepia-400">
-          {nodes.length} persones · {links.length} connexions
+          {nodes.length} {nodes.length === 1 ? "persona" : "persones"} ·{" "}
+          {links.length} {links.length === 1 ? "connexió" : "connexions"}
         </div>
       </div>
-      <ForceGraph2D
-        width={size.w}
-        height={size.h}
-        graphData={{ nodes, links }}
-        backgroundColor="#FBF7F0"
-        linkColor={() => "rgba(184, 149, 93, 0.35)"}
-        linkWidth={(l: any) => 0.6 + Math.log((l.value || 1) + 1)}
-        nodeRelSize={5}
-        cooldownTicks={80}
-        nodeCanvasObject={(node: any, ctx, globalScale) => {
-          const label = node.nom as string;
-          const r = 6 + (node.count / maxCount) * 12;
-          // Cercle
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-          const grad = ctx.createRadialGradient(node.x, node.y, 1, node.x, node.y, r);
-          grad.addColorStop(0, "#C97B63");
-          grad.addColorStop(1, "#8F6A3A");
-          ctx.fillStyle = grad;
-          ctx.fill();
-          ctx.strokeStyle = "#FBF7F0";
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          // Etiqueta
-          const fontSize = Math.max(10, 12 / globalScale);
-          ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
-          ctx.fillStyle = "#4A321A";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-          ctx.fillText(label, node.x, node.y + r + 2);
-        }}
-      />
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        width="100%"
+        height={h}
+        className="block"
+        style={{ background: "#FBF7F0" }}
+      >
+        <defs>
+          <radialGradient id="nodeGrad" cx="40%" cy="40%" r="60%">
+            <stop offset="0%" stopColor="#D68B72" />
+            <stop offset="100%" stopColor="#8F6A3A" />
+          </radialGradient>
+        </defs>
+
+        {/* Links */}
+        <g>
+          {links.map((l, i) => {
+            const a = positions.get(l.source as string);
+            const b = positions.get(l.target as string);
+            if (!a || !b) return null;
+            return (
+              <line
+                key={i}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="rgba(184, 149, 93, 0.45)"
+                strokeWidth={0.8 + Math.min(3, Math.log(l.value + 1))}
+                strokeLinecap="round"
+              />
+            );
+          })}
+        </g>
+
+        {/* Nodes */}
+        <g>
+          {Array.from(positions.entries()).map(([id, p]) => (
+            <g key={id}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={p.r}
+                fill="url(#nodeGrad)"
+                stroke="#FBF7F0"
+                strokeWidth={1.5}
+              />
+              <text
+                x={p.x}
+                y={p.y + p.r + 14}
+                textAnchor="middle"
+                fontSize={12}
+                fontFamily="Inter, system-ui, sans-serif"
+                fill="#4A321A"
+              >
+                {p.nom}
+              </text>
+            </g>
+          ))}
+        </g>
+      </svg>
     </div>
   );
 }
