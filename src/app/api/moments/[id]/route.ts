@@ -68,6 +68,19 @@ export async function PATCH(
     }
   }
 
+  // Si s'ha actualitzat `pujat_per`, assegura't que existeixi també a persones.
+  if (typeof camps.pujat_per === "string" && camps.pujat_per) {
+    const nomAutor = camps.pujat_per as string;
+    const { data: existing } = await admin
+      .from("persones")
+      .select("id")
+      .ilike("nom", nomAutor)
+      .maybeSingle();
+    if (!existing) {
+      await admin.from("persones").insert({ nom: nomAutor });
+    }
+  }
+
   // Actualitzar persones si s'han enviat
   if (Array.isArray(body.persones)) {
     const noms: string[] = body.persones

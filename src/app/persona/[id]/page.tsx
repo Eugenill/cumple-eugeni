@@ -34,6 +34,11 @@ export default async function PersonaPage({
     m.persones.some((p) => p.id === params.id)
   );
 
+  const { data: totesPersones } = await supabase
+    .from("persones")
+    .select("id, nom")
+    .order("nom");
+
   // Persones en comú (unió de persones que apareixen als seus moments, excepte ella)
   const comunsMap = new Map<string, { id: string; nom: string; count: number }>();
   for (const m of moments) {
@@ -126,7 +131,11 @@ export default async function PersonaPage({
             </p>
           </div>
         ) : (
-          <Timeline moments={moments} bucketPublicUrl={bucketPublicUrl} />
+          <Timeline
+            moments={moments}
+            bucketPublicUrl={bucketPublicUrl}
+            personesSuggerides={totesPersones ?? []}
+          />
         )}
       </section>
     </div>

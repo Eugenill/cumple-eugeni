@@ -19,8 +19,20 @@ async function fetchMoments(): Promise<MomentAmbRelacions[]> {
   return (data ?? []) as MomentAmbRelacions[];
 }
 
+async function fetchPersones() {
+  const supabase = createSupabasePublicClient();
+  const { data } = await supabase
+    .from("persones")
+    .select("id, nom")
+    .order("nom");
+  return data ?? [];
+}
+
 export default async function HomePage() {
-  const moments = await fetchMoments();
+  const [moments, persones] = await Promise.all([
+    fetchMoments(),
+    fetchPersones(),
+  ]);
   const bucketPublicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}`;
 
   const totalMoments = moments.length;
@@ -68,7 +80,11 @@ export default async function HomePage() {
           <div className="hand text-accent-rose text-xl">any rere any</div>
           <h2 className="font-serif text-4xl">La línia del temps</h2>
         </div>
-        <Timeline moments={moments} bucketPublicUrl={bucketPublicUrl} />
+        <Timeline
+          moments={moments}
+          bucketPublicUrl={bucketPublicUrl}
+          personesSuggerides={persones}
+        />
       </section>
     </div>
   );

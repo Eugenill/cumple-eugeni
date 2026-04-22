@@ -1,12 +1,18 @@
 import { MomentAmbRelacions, formatDataCatala, obtenirAny } from "@/lib/utils";
 import { MomentCard } from "./MomentCard";
+import { EditRecordButton } from "./EditRecordButton";
 
 type Props = {
   moments: MomentAmbRelacions[];
   bucketPublicUrl: string;
+  personesSuggerides?: { id: string; nom: string }[];
 };
 
-export function Timeline({ moments, bucketPublicUrl }: Props) {
+export function Timeline({
+  moments,
+  bucketPublicUrl,
+  personesSuggerides = [],
+}: Props) {
   if (moments.length === 0) {
     return (
       <div className="card p-10 text-center">
@@ -82,11 +88,18 @@ export function Timeline({ moments, bucketPublicUrl }: Props) {
                           </span>
                         ))}
                       </div>
-                      {m.pujat_per && (
-                        <div className="text-xs text-sepia-400 mt-3">
-                          Pujat per {m.pujat_per}
-                        </div>
-                      )}
+                      <div
+                        className={`text-xs text-sepia-400 mt-3 flex items-center gap-3 ${
+                          esquerra ? "md:justify-end" : ""
+                        }`}
+                      >
+                        {m.pujat_per && <span>Pujat per {m.pujat_per}</span>}
+                        <EditRecordButton
+                          momentId={m.id}
+                          personesSuggerides={personesSuggerides}
+                          label="Editar"
+                        />
+                      </div>
                     </div>
 
                     <div className={`pl-10 md:pl-0 ${esquerra ? "md:order-2" : "md:order-1"}`}>

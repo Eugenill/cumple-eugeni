@@ -23,14 +23,16 @@ export function Header() {
               Admin
             </Link>
           )}
-          <Link href="/" className="ink-btn-outline hidden md:inline-flex">
-            Línia del temps
+          <Link href="/records" className="ink-btn-outline">
+            <span className="hidden sm:inline">Els meus records</span>
+            <span className="sm:hidden">Records</span>
           </Link>
           <Link href="/pujar" className="ink-btn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Afegir record
+            <span className="hidden sm:inline">Afegir record</span>
+            <span className="sm:hidden">Afegir</span>
           </Link>
         </nav>
       </div>

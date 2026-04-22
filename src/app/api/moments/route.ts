@@ -45,6 +45,19 @@ export async function POST(req: Request) {
       );
     }
 
+    // 1bis. Si hi ha pujat_per, ens assegurem que existeix també a `persones`
+    // perquè sigui seleccionable a la resta del formulari.
+    if (pujat_per) {
+      const { data: existing } = await admin
+        .from("persones")
+        .select("id, nom")
+        .ilike("nom", pujat_per)
+        .maybeSingle();
+      if (!existing) {
+        await admin.from("persones").insert({ nom: pujat_per }).select();
+      }
+    }
+
     // 2. Upsert de persones i vincles
     if (noms.length > 0) {
       const { data: personesExistents } = await admin

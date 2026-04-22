@@ -15,10 +15,9 @@ export function UploadForm({ personesSuggerides }: Props) {
   const [fitxers, setFitxers] = useState<File[]>([]);
   const [persones, setPersones] = useState<string[]>([]);
   const [novaPersona, setNovaPersona] = useState("");
+  const [pujatPer, setPujatPer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<{ id: string; editUrl: string } | null>(null);
-  const [copiat, setCopiat] = useState(false);
 
   function afegirPersona(nom: string) {
     const n = nom.trim();
@@ -53,71 +52,20 @@ export function UploadForm({ personesSuggerides }: Props) {
     form.delete("fitxers");
     fitxers.forEach((f) => form.append("fitxers", f));
     form.set("persones", persones.join(","));
+    form.set("pujat_per", pujatPer);
 
     try {
       const res = await fetch("/api/moments", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Error al pujar");
-      const editUrl = `${window.location.origin}/record/${data.id}/editar?codi=${data.edit_token}`;
-      setOk({ id: data.id, editUrl });
-    } catch (err: any) {
-      setError(err.message || "Error inesperat");
-    } finally {
+      // Tornem a la home directament — la línia del temps mostrarà el nou record.
+      router.push("/");
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error inesperat";
+      setError(msg);
       setLoading(false);
     }
-  }
-
-  async function copiarEnllac() {
-    if (!ok) return;
-    try {
-      await navigator.clipboard.writeText(ok.editUrl);
-      setCopiat(true);
-      setTimeout(() => setCopiat(false), 2000);
-    } catch {
-      // noop
-    }
-  }
-
-  if (ok) {
-    return (
-      <div className="card p-8 md:p-10">
-        <div className="text-center">
-          <div className="hand text-3xl text-accent-rose">gràcies ♥</div>
-          <h2 className="font-serif text-3xl mt-2">Record afegit!</h2>
-        </div>
-
-        <div className="mt-6 bg-cream-100 border border-cream-200 rounded-xl p-5">
-          <div className="font-serif text-xl text-sepia-700">
-            Guarda aquest enllaç
-          </div>
-          <p className="text-sepia-500 text-sm mt-1">
-            És el teu enllaç privat per <strong>editar</strong> o{" "}
-            <strong>esborrar</strong> aquest record més endavant. Només
-            funciona per al record que acabes de pujar. Si el perds, ningú
-            (tret de l&apos;Eugeni) podrà modificar-lo.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <input
-              readOnly
-              value={ok.editUrl}
-              className="input font-mono text-xs"
-              onFocus={(e) => e.currentTarget.select()}
-            />
-            <button type="button" onClick={copiarEnllac} className="ink-btn-outline whitespace-nowrap">
-              {copiat ? "Copiat ✓" : "Copiar"}
-            </button>
-          </div>
-          <div className="text-xs text-sepia-400 mt-2">
-            Consell: envia&apos;l al teu propi WhatsApp o guarda&apos;l als marcadors.
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 mt-6">
-          <a href="/" className="ink-btn-outline">Veure la línia del temps</a>
-          <a href={ok.editUrl} className="ink-btn">Gestionar aquest record</a>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -277,13 +225,50 @@ export function UploadForm({ personesSuggerides }: Props) {
       </div>
 
       <div>
-        <label className="label" htmlFor="pujat_per">Qui ho puja? (opcional)</label>
+        <label className="label" htmlFor="pujat_per">Qui ho puja?</label>
         <input
           id="pujat_per"
-          name="pujat_per"
+          value={pujatPer}
+          onChange={(e) => setPujatPer(e.target.value)}
           className="input"
           placeholder="El teu nom"
+          list="persones-pujades-per"
         />
+        <datalist id="persones-pujades-per">
+          {personesSuggerides.map((p) => (
+            <option key={p.id} value={p.nom} />
+          ))}
+        </datalist>
+        {personesSuggerides.length > 0 && (
+          <div className="mt-2">
+            <div className="text-xs text-sepia-400 mb-1">
+              O tria ràpidament:
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {personesSuggerides.slice(0, 14).map((p) => {
+                const actiu = pujatPer.toLowerCase() === p.nom.toLowerCase();
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPujatPer(p.nom)}
+                    className={`chip transition ${
+                      actiu
+                        ? "bg-accent-rose/15 border-accent-rose/40 text-accent-rose"
+                        : "hover:bg-cream-200"
+                    }`}
+                  >
+                    {p.nom}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-sepia-400 mt-2">
+          El teu nom queda lligat a aquest record perquè més tard el puguis
+          editar o esborrar des de <span className="italic">Els meus records</span>.
+        </p>
       </div>
 
       {error && (

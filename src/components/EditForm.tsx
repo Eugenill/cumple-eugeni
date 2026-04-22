@@ -206,7 +206,39 @@ export function EditForm({
           className="input"
           value={pujatPer}
           onChange={(e) => setPujatPer(e.target.value)}
+          list="persones-pujades-per-edit"
         />
+        <datalist id="persones-pujades-per-edit">
+          {personesSuggerides.map((p) => (
+            <option key={p.id} value={p.nom} />
+          ))}
+        </datalist>
+        {personesSuggerides.length > 0 && (
+          <div className="mt-2">
+            <div className="text-xs text-sepia-400 mb-1">
+              O tria ràpidament:
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {personesSuggerides.slice(0, 14).map((p) => {
+                const actiu = pujatPer.toLowerCase() === p.nom.toLowerCase();
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPujatPer(p.nom)}
+                    className={`chip transition ${
+                      actiu
+                        ? "bg-accent-rose/15 border-accent-rose/40 text-accent-rose"
+                        : "hover:bg-cream-200"
+                    }`}
+                  >
+                    {p.nom}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
