@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   return (
@@ -22,7 +22,6 @@ function LoginFallback() {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const redirect = params.get("redirect") || "/";
   const initialAdmin = params.get("admin") === "1";
@@ -39,14 +38,17 @@ function LoginForm() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
+      credentials: "same-origin",
     });
-    setLoading(false);
     if (res.ok) {
-      router.push(isAdmin ? "/admin" : redirect);
-      router.refresh();
-    } else {
-      setError("La contrasenya no és correcta. Torna-ho a provar.");
+      // Forcem un full reload perquè el middleware i els Server Components
+      // vegin la cookie nova sense cap retard ni caché de client.
+      const dest = isAdmin ? "/admin" : redirect || "/";
+      window.location.assign(dest);
+      return;
     }
+    setLoading(false);
+    setError("La contrasenya no és correcta. Torna-ho a provar.");
   }
 
   return (
