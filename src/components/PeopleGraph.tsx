@@ -20,10 +20,17 @@ type GraphLink = {
   value: number;
 };
 
+const HOVER_DELAY_MS = 3000;
+const CLOSE_GRACE_MS = 180;
+
 export function PeopleGraph({ moments }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(640);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [hoverInfoId, setHoverInfoId] = useState<string | null>(null);
+  const openTimerRef = useRef<number | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -44,6 +51,14 @@ export function PeopleGraph({ moments }: Props) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Neteja timers en desmuntar
+  useEffect(() => {
+    return () => {
+      if (openTimerRef.current) window.clearTimeout(openTimerRef.current);
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    };
   }, []);
 
   const { nodes, links } = useMemo(() => {
@@ -79,17 +94,33 @@ export function PeopleGraph({ moments }: Props) {
     };
   }, [moments]);
 
-  // Ids connectats a la persona seleccionada (ella + veïns directes)
+  // activeId: qui estem destacant ara (seleccionat > passatge del cursor)
+  const activeId = selectedId ?? hoveredId;
+  const hasActive = activeId !== null;
+
+  // Ids connectats a la persona activa (ella + veïns directes)
   const connectedIds = useMemo(() => {
-    if (!selectedId) return new Set<string>();
-    const s = new Set<string>([selectedId]);
+    if (!activeId) return new Set<string>();
+    const s = new Set<string>([activeId]);
     for (const l of links) {
-      if (l.source === selectedId) s.add(l.target);
-      if (l.target === selectedId) s.add(l.source);
+      if (l.source === activeId) s.add(l.target);
+      if (l.target === activeId) s.add(l.source);
     }
     return s;
-  }, [selectedId, links]);
+  }, [activeId, links]);
 
+  // Ids connectats al node del popover (pot ser diferent del node seleccionat)
+  const hoverInfoConnected = useMemo(() => {
+    if (!hoverInfoId) return new Set<string>();
+    const s = new Set<string>([hoverInfoId]);
+    for (const l of links) {
+      if (l.source === hoverInfoId) s.add(l.target);
+      if (l.target === hoverInfoId) s.add(l.source);
+    }
+    return s;
+  }, [hoverInfoId, links]);
+
+  // Records de la persona seleccionada per al dialog
   const personaMoments = useMemo(() => {
     if (!selectedId) return [];
     return [...moments]
@@ -99,6 +130,10 @@ export function PeopleGraph({ moments }: Props) {
 
   const selected = selectedId
     ? nodes.find((n) => n.id === selectedId) || null
+    : null;
+
+  const hoverInfoNode = hoverInfoId
+    ? nodes.find((n) => n.id === hoverInfoId) || null
     : null;
 
   if (nodes.length === 0) {
@@ -117,7 +152,6 @@ export function PeopleGraph({ moments }: Props) {
   const cy = h / 2;
   const maxCount = Math.max(...nodes.map((n) => n.count), 1);
 
-  // Posicions: el node més connectat al centre, la resta en cercle al voltant.
   const radius = Math.min(w, h) * 0.38;
   type Pos = { x: number; y: number; r: number; nom: string; count: number };
   const positions = new Map<string, Pos>();
@@ -152,7 +186,65 @@ export function PeopleGraph({ moments }: Props) {
     });
   }
 
-  const hasSelection = selectedId !== null;
+  // ---- hover timers ----
+  function cancelOpen() {
+    if (openTimerRef.current) {
+      window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+  }
+  function cancelClose() {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+  function scheduleClose() {
+    cancelClose();
+    closeTimerRef.current = window.setTimeout(() => {
+      setHoverInfoId(null);
+    }, CLOSE_GRACE_MS);
+  }
+
+  function onNodeEnter(id: string) {
+    cancelClose();
+    setHoveredId(id);
+    cancelOpen();
+    if (hoverInfoId && hoverInfoId !== id) {
+      setHoverInfoId(null);
+    }
+    openTimerRef.current = window.setTimeout(() => {
+      setHoverInfoId(id);
+    }, HOVER_DELAY_MS);
+  }
+
+  function onNodeLeave() {
+    cancelOpen();
+    setHoveredId(null);
+    scheduleClose();
+  }
+
+  function onPopoverEnter() {
+    cancelClose();
+  }
+
+  function onPopoverLeave() {
+    scheduleClose();
+  }
+
+  // Posició del popover (dins del SVG, en coordenades de viewBox)
+  const popoverPos = hoverInfoNode ? positions.get(hoverInfoNode.id) : null;
+  const popoverWidth = 220;
+  const popoverLeft = popoverPos
+    ? Math.max(8, Math.min(w - popoverWidth - 8, popoverPos.x - popoverWidth / 2))
+    : 0;
+  // Si el node és a la meitat de baix, posa el popover a sobre; si no, a sota
+  const popoverBelow = popoverPos ? popoverPos.y < h / 2 : true;
+  const popoverTop = popoverPos
+    ? popoverBelow
+      ? popoverPos.y + popoverPos.r + 12
+      : popoverPos.y - popoverPos.r - 12
+    : 0;
 
   return (
     <div ref={containerRef} className="card overflow-hidden relative">
@@ -165,130 +257,186 @@ export function PeopleGraph({ moments }: Props) {
           {nodes.length} {nodes.length === 1 ? "persona" : "persones"} ·{" "}
           {links.length} {links.length === 1 ? "connexió" : "connexions"}
           <div className="hand text-accent-rose/80 mt-0.5">
-            prem un nom per veure els seus records
+            passa el cursor o prem un nom
           </div>
         </div>
       </div>
-      <svg
-        viewBox={`0 0 ${w} ${h}`}
-        width="100%"
-        height={h}
-        className="block"
-        style={{ background: "#FBF7F0" }}
-      >
-        <defs>
-          <radialGradient id="nodeGrad" cx="40%" cy="40%" r="60%">
-            <stop offset="0%" stopColor="#D68B72" />
-            <stop offset="100%" stopColor="#8F6A3A" />
-          </radialGradient>
-          <radialGradient id="nodeGradActive" cx="40%" cy="40%" r="60%">
-            <stop offset="0%" stopColor="#E8A48C" />
-            <stop offset="100%" stopColor="#B5613E" />
-          </radialGradient>
-        </defs>
 
-        {/* Fons clicable per deseleccionar */}
-        <rect
-          x={0}
-          y={0}
-          width={w}
+      <div className="relative">
+        <svg
+          viewBox={`0 0 ${w} ${h}`}
+          width="100%"
           height={h}
-          fill="transparent"
-          onClick={() => setSelectedId(null)}
-        />
+          className="block"
+          style={{ background: "#FBF7F0" }}
+        >
+          <defs>
+            <radialGradient id="nodeGrad" cx="40%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#D68B72" />
+              <stop offset="100%" stopColor="#8F6A3A" />
+            </radialGradient>
+            <radialGradient id="nodeGradActive" cx="40%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#E8A48C" />
+              <stop offset="100%" stopColor="#B5613E" />
+            </radialGradient>
+          </defs>
 
-        {/* Links */}
-        <g>
-          {links.map((l, i) => {
-            const a = positions.get(l.source as string);
-            const b = positions.get(l.target as string);
-            if (!a || !b) return null;
-            const involvesSelected =
-              hasSelection &&
-              (l.source === selectedId || l.target === selectedId);
-            const opacity = !hasSelection
-              ? 0.45
-              : involvesSelected
-              ? 0.9
-              : 0.08;
-            const stroke = involvesSelected
-              ? "rgba(214, 139, 114, 1)"
-              : "rgba(184, 149, 93, 0.6)";
-            return (
-              <line
-                key={i}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={stroke}
-                strokeOpacity={opacity}
-                strokeWidth={
-                  (0.8 + Math.min(3, Math.log(l.value + 1))) *
-                  (involvesSelected ? 1.6 : 1)
-                }
-                strokeLinecap="round"
-                style={{ transition: "all 200ms ease" }}
-              />
-            );
-          })}
-        </g>
+          {/* Fons clicable per deseleccionar */}
+          <rect
+            x={0}
+            y={0}
+            width={w}
+            height={h}
+            fill="transparent"
+            onClick={() => setSelectedId(null)}
+          />
 
-        {/* Nodes */}
-        <g>
-          {Array.from(positions.entries()).map(([id, p]) => {
-            const active = id === selectedId;
-            const dimmed = hasSelection && !connectedIds.has(id);
-            const groupOpacity = dimmed ? 0.22 : 1;
-            return (
-              <g
-                key={id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedId((cur) => (cur === id ? null : id));
-                }}
-                style={{
-                  cursor: "pointer",
-                  opacity: groupOpacity,
-                  transition: "opacity 200ms ease",
-                }}
-              >
-                {active && (
+          {/* Links */}
+          <g>
+            {links.map((l, i) => {
+              const a = positions.get(l.source as string);
+              const b = positions.get(l.target as string);
+              if (!a || !b) return null;
+              const involvesActive =
+                hasActive &&
+                (l.source === activeId || l.target === activeId);
+              const opacity = !hasActive
+                ? 0.45
+                : involvesActive
+                ? 0.9
+                : 0.1;
+              const stroke = involvesActive
+                ? "rgba(214, 139, 114, 1)"
+                : "rgba(184, 149, 93, 0.6)";
+              return (
+                <line
+                  key={i}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={stroke}
+                  strokeOpacity={opacity}
+                  strokeWidth={
+                    (0.8 + Math.min(3, Math.log(l.value + 1))) *
+                    (involvesActive ? 1.6 : 1)
+                  }
+                  strokeLinecap="round"
+                  style={{ transition: "all 180ms ease" }}
+                />
+              );
+            })}
+          </g>
+
+          {/* Nodes */}
+          <g>
+            {Array.from(positions.entries()).map(([id, p]) => {
+              const isSelected = id === selectedId;
+              const isHovered = id === hoveredId;
+              const isActive = isSelected || isHovered;
+              const dimmed = hasActive && !connectedIds.has(id);
+              const groupOpacity = dimmed ? 0.22 : 1;
+              const extraR = isHovered && !isSelected ? 3 : 0;
+              return (
+                <g
+                  key={id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedId((cur) => (cur === id ? null : id));
+                  }}
+                  onMouseEnter={() => onNodeEnter(id)}
+                  onMouseLeave={onNodeLeave}
+                  style={{
+                    cursor: "pointer",
+                    opacity: groupOpacity,
+                    transition: "opacity 180ms ease",
+                  }}
+                >
+                  {isActive && (
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={p.r + 7 + extraR}
+                      fill="none"
+                      stroke="#D68B72"
+                      strokeOpacity={isSelected ? 0.5 : 0.35}
+                      strokeWidth={2}
+                      style={{ transition: "r 180ms ease" }}
+                    />
+                  )}
                   <circle
                     cx={p.x}
                     cy={p.y}
-                    r={p.r + 7}
-                    fill="none"
-                    stroke="#D68B72"
-                    strokeOpacity={0.5}
-                    strokeWidth={2}
+                    r={p.r + extraR}
+                    fill={isActive ? "url(#nodeGradActive)" : "url(#nodeGrad)"}
+                    stroke="#FBF7F0"
+                    strokeWidth={1.5}
+                    style={{ transition: "r 180ms ease, fill 180ms ease" }}
                   />
-                )}
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={p.r}
-                  fill={active ? "url(#nodeGradActive)" : "url(#nodeGrad)"}
-                  stroke="#FBF7F0"
-                  strokeWidth={1.5}
-                />
-                <text
-                  x={p.x}
-                  y={p.y + p.r + 14}
-                  textAnchor="middle"
-                  fontSize={active ? 13 : 12}
-                  fontWeight={active ? 600 : 400}
-                  fontFamily="Inter, system-ui, sans-serif"
-                  fill="#4A321A"
-                  style={{ userSelect: "none" }}
-                >
-                  {p.nom}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-      </svg>
+                  <text
+                    x={p.x}
+                    y={p.y + p.r + 14 + extraR}
+                    textAnchor="middle"
+                    fontSize={isActive ? 13 : 12}
+                    fontWeight={isActive ? 600 : 400}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fill="#4A321A"
+                    style={{
+                      userSelect: "none",
+                      transition: "font-size 180ms ease",
+                    }}
+                  >
+                    {p.nom}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+
+        {/* Popover al passar el cursor (3s) */}
+        {hoverInfoNode && popoverPos && (
+          <div
+            className="absolute z-10 card px-4 py-3 shadow-soft"
+            style={{
+              width: popoverWidth,
+              left: popoverLeft,
+              top: popoverTop,
+              transform: popoverBelow ? "none" : "translateY(-100%)",
+              pointerEvents: "auto",
+            }}
+            onMouseEnter={onPopoverEnter}
+            onMouseLeave={onPopoverLeave}
+          >
+            <div className="hand text-accent-rose text-xs">persona</div>
+            <div className="font-serif text-lg text-sepia-700 leading-tight truncate">
+              {hoverInfoNode.nom}
+            </div>
+            <div className="text-xs text-sepia-500 mt-0.5">
+              {hoverInfoNode.count}{" "}
+              {hoverInfoNode.count === 1 ? "record" : "records"}
+              {hoverInfoConnected.size > 1 && (
+                <>
+                  {" · "}
+                  {hoverInfoConnected.size - 1}{" "}
+                  {hoverInfoConnected.size - 1 === 1 ? "persona" : "persones"}
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedId(hoverInfoNode.id);
+                setHoverInfoId(null);
+                setHoveredId(null);
+              }}
+              className="ink-btn w-full mt-3 justify-center text-sm"
+            >
+              Veure records →
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Dialog amb el resum de la persona seleccionada */}
       {selected && (
@@ -378,6 +526,7 @@ export function PeopleGraph({ moments }: Props) {
           </div>
         </div>
       )}
+
     </div>
   );
 }
