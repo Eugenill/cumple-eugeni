@@ -23,12 +23,36 @@ type GraphLink = {
 const HOVER_DELAY_MS = 3000;
 const CLOSE_GRACE_MS = 180;
 
+// --- utilitats de moviment ---
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function drift(id: string, t: number, amp = 4) {
+  const h = hashStr(id);
+  const phaseX = ((h % 1000) / 1000) * Math.PI * 2;
+  const phaseY = (((h >> 4) % 1000) / 1000) * Math.PI * 2;
+  const freqX = 0.35 + ((h % 10) / 40); // 0.35 .. 0.6
+  const freqY = 0.3 + (((h >> 3) % 10) / 45);
+  return {
+    dx: Math.sin(t * freqX + phaseX) * amp,
+    dy: Math.cos(t * freqY + phaseY) * amp * 0.85,
+  };
+}
+
 export function PeopleGraph({ moments }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(640);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoverInfoId, setHoverInfoId] = useState<string | null>(null);
+  const [t, setT] = useState(() =>
+    typeof performance !== "undefined" ? performance.now() / 1000 : 0
+  );
   const openTimerRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
 
@@ -42,6 +66,18 @@ export function PeopleGraph({ moments }: Props) {
     });
     obs.observe(el);
     return () => obs.disconnect();
+  }, []);
+
+  // Loop d'animació: actualitza el temps ~60 vegades/s per fer que
+  // els nodes es moguin suaument ("viu").
+  useEffect(() => {
+    let raf = 0;
+    const loop = () => {
+      setT(performance.now() / 1000);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Tanca el dialog amb la tecla Esc
@@ -147,28 +183,44 @@ export function PeopleGraph({ moments }: Props) {
     );
   }
 
-  const h = Math.max(360, Math.min(520, Math.round(w * 0.55)));
+  // Sense el marc, podem ser més generosos amb l'alçada.
+  const h = Math.max(420, Math.min(620, Math.round(w * 0.6)));
   const cx = w / 2;
   const cy = h / 2;
   const maxCount = Math.max(...nodes.map((n) => n.count), 1);
 
   const radius = Math.min(w, h) * 0.38;
-  type Pos = { x: number; y: number; r: number; nom: string; count: number };
+
+  // Amplitud de moviment: una mica més gran pel centre (és més gran),
+  // i una mica menor per l'activa (per llegibilitat sobre el text).
+  type Pos = {
+    x: number;
+    y: number;
+    r: number;
+    nom: string;
+    count: number;
+  };
   const positions = new Map<string, Pos>();
 
   const [centre, ...resta] = nodes;
-  positions.set(centre.id, {
-    x: cx,
-    y: cy,
-    r: 14 + (centre.count / maxCount) * 10,
-    nom: centre.nom,
-    count: centre.count,
-  });
+
+  // Node central: drift lleuger
+  {
+    const d = drift(centre.id, t, 3);
+    positions.set(centre.id, {
+      x: cx + d.dx,
+      y: cy + d.dy,
+      r: 14 + (centre.count / maxCount) * 10,
+      nom: centre.nom,
+      count: centre.count,
+    });
+  }
 
   if (resta.length === 1) {
+    const d = drift(resta[0].id, t, 5);
     positions.set(resta[0].id, {
-      x: cx + radius,
-      y: cy,
+      x: cx + radius + d.dx,
+      y: cy + d.dy,
       r: 10 + (resta[0].count / maxCount) * 10,
       nom: resta[0].nom,
       count: resta[0].count,
@@ -176,9 +228,10 @@ export function PeopleGraph({ moments }: Props) {
   } else {
     resta.forEach((n, i) => {
       const angle = (i / resta.length) * Math.PI * 2 - Math.PI / 2;
+      const d = drift(n.id, t, 5);
       positions.set(n.id, {
-        x: cx + Math.cos(angle) * radius,
-        y: cy + Math.sin(angle) * radius,
+        x: cx + Math.cos(angle) * radius + d.dx,
+        y: cy + Math.sin(angle) * radius + d.dy,
         r: 8 + (n.count / maxCount) * 10,
         nom: n.nom,
         count: n.count,
@@ -247,19 +300,18 @@ export function PeopleGraph({ moments }: Props) {
     : 0;
 
   return (
-    <div ref={containerRef} className="card overflow-hidden relative">
-      <div className="px-5 pt-4 pb-2 flex items-end justify-between gap-3">
-        <div>
-          <div className="hand text-accent-rose text-lg">qui hi surt</div>
-          <h3 className="font-serif text-2xl">Xarxa de persones</h3>
-        </div>
-        <div className="text-xs text-sepia-400 text-right">
+    <div ref={containerRef} className="relative">
+      {/* Encapçalament centrat — sense marc al voltant del graf */}
+      <div className="text-center mb-6">
+        <div className="hand text-accent-rose text-xl">qui hi surt</div>
+        <h2 className="font-serif text-4xl">Xarxa de persones</h2>
+        <p className="text-sepia-500 text-sm mt-2">
           {nodes.length} {nodes.length === 1 ? "persona" : "persones"} ·{" "}
           {links.length} {links.length === 1 ? "connexió" : "connexions"}
-          <div className="hand text-accent-rose/80 mt-0.5">
-            passa el cursor o prem un nom
-          </div>
-        </div>
+        </p>
+        <p className="hand text-accent-rose/80 text-sm mt-1">
+          passa el cursor o prem un nom
+        </p>
       </div>
 
       <div className="relative">
@@ -268,7 +320,6 @@ export function PeopleGraph({ moments }: Props) {
           width="100%"
           height={h}
           className="block"
-          style={{ background: "#FBF7F0" }}
         >
           <defs>
             <radialGradient id="nodeGrad" cx="40%" cy="40%" r="60%">
@@ -322,7 +373,6 @@ export function PeopleGraph({ moments }: Props) {
                     (involvesActive ? 1.6 : 1)
                   }
                   strokeLinecap="round"
-                  style={{ transition: "all 180ms ease" }}
                 />
               );
             })}
@@ -361,7 +411,6 @@ export function PeopleGraph({ moments }: Props) {
                       stroke="#D68B72"
                       strokeOpacity={isSelected ? 0.5 : 0.35}
                       strokeWidth={2}
-                      style={{ transition: "r 180ms ease" }}
                     />
                   )}
                   <circle
@@ -371,7 +420,6 @@ export function PeopleGraph({ moments }: Props) {
                     fill={isActive ? "url(#nodeGradActive)" : "url(#nodeGrad)"}
                     stroke="#FBF7F0"
                     strokeWidth={1.5}
-                    style={{ transition: "r 180ms ease, fill 180ms ease" }}
                   />
                   <text
                     x={p.x}
@@ -383,7 +431,6 @@ export function PeopleGraph({ moments }: Props) {
                     fill="#4A321A"
                     style={{
                       userSelect: "none",
-                      transition: "font-size 180ms ease",
                     }}
                   >
                     {p.nom}
@@ -526,7 +573,6 @@ export function PeopleGraph({ moments }: Props) {
           </div>
         </div>
       )}
-
     </div>
   );
 }
