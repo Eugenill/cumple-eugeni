@@ -8,10 +8,18 @@ type Props = {
   persones: { id: string; nom: string }[];
   moments: MomentAmbRelacions[];
   bucketPublicUrl: string;
+  /** Nom pre-seleccionat (pres de la sessió). */
+  nomInicial?: string;
 };
 
-export function RecordsBrowser({ persones, moments, bucketPublicUrl }: Props) {
-  const [nom, setNom] = useState<string>("");
+export function RecordsBrowser({
+  persones,
+  moments,
+  bucketPublicUrl,
+  nomInicial = "",
+}: Props) {
+  const [nom, setNom] = useState<string>(nomInicial);
+  const [canviant, setCanviant] = useState<boolean>(!nomInicial);
 
   // Records on la persona apareix (tagejada) o que ha pujat ella mateixa.
   const recordsMeus = useMemo(() => {
@@ -38,59 +46,80 @@ export function RecordsBrowser({ persones, moments, bucketPublicUrl }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="card p-5">
-        <label className="label" htmlFor="nom-select">
-          Tria el teu nom
-        </label>
-        <div className="flex gap-2 items-stretch">
-          <input
-            id="nom-select"
-            list="persones-records"
-            className="input flex-1"
-            value={nom}
-            onChange={(e) => setNom(e.target.value)}
-            placeholder="Ex: Iraïs"
-          />
-          <datalist id="persones-records">
-            {persones.map((p) => (
-              <option key={p.id} value={p.nom} />
-            ))}
-          </datalist>
-          {nom && (
-            <button
-              type="button"
-              onClick={() => setNom("")}
-              className="ink-btn-outline"
-            >
-              Netejar
-            </button>
+      {canviant ? (
+        <div className="card p-5">
+          <label className="label" htmlFor="nom-select">
+            Tria un nom
+          </label>
+          <div className="flex gap-2 items-stretch">
+            <input
+              id="nom-select"
+              list="persones-records"
+              className="input flex-1"
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
+              placeholder="Ex: Iraïs"
+              autoFocus
+            />
+            <datalist id="persones-records">
+              {persones.map((p) => (
+                <option key={p.id} value={p.nom} />
+              ))}
+            </datalist>
+            {nomInicial && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNom(nomInicial);
+                  setCanviant(false);
+                }}
+                className="ink-btn-outline"
+              >
+                Tornar a mi
+              </button>
+            )}
+          </div>
+          {persones.length > 0 && (
+            <div className="mt-3">
+              <div className="text-xs text-sepia-400 mb-1">O tria ràpidament:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {persones.map((p) => {
+                  const actiu = nom.toLowerCase() === p.nom.toLowerCase();
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setNom(p.nom);
+                        setCanviant(false);
+                      }}
+                      className={`chip transition ${
+                        actiu
+                          ? "bg-accent-rose/15 border-accent-rose/40 text-accent-rose"
+                          : "hover:bg-cream-200"
+                      }`}
+                    >
+                      {p.nom}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
-        {persones.length > 0 && (
-          <div className="mt-3">
-            <div className="text-xs text-sepia-400 mb-1">O tria ràpidament:</div>
-            <div className="flex flex-wrap gap-1.5">
-              {persones.map((p) => {
-                const actiu = nom.toLowerCase() === p.nom.toLowerCase();
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setNom(p.nom)}
-                    className={`chip transition ${
-                      actiu
-                        ? "bg-accent-rose/15 border-accent-rose/40 text-accent-rose"
-                        : "hover:bg-cream-200"
-                    }`}
-                  >
-                    {p.nom}
-                  </button>
-                );
-              })}
-            </div>
+      ) : (
+        nom && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setCanviant(true)}
+              className="text-xs text-sepia-500 hover:text-accent-rose underline underline-offset-2 decoration-dotted"
+            >
+              Veure la línia d&apos;una altra persona
+            </button>
           </div>
-        )}
-      </div>
+        )
+      )}
 
       {!nom.trim() ? (
         <div className="card p-8 text-center">

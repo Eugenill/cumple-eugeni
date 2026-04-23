@@ -1,8 +1,8 @@
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { createSupabaseAdminClient, BUCKET } from "@/lib/supabase/server";
 import { MomentAmbRelacions } from "@/lib/utils";
 import { EditForm } from "@/components/EditForm";
+import { obtenirNomUsuari } from "@/lib/auth";
 
 export const revalidate = 0;
 
@@ -12,7 +12,7 @@ type Props = {
 
 export default async function EditarPage({ params }: Props) {
   const admin = createSupabaseAdminClient();
-  const esAdmin = cookies().get("eugeni_admin")?.value === "ok";
+  const nomUsuari = obtenirNomUsuari();
 
   const { data: moment } = await admin
     .from("moments")
@@ -58,9 +58,7 @@ export default async function EditarPage({ params }: Props) {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="text-center">
-        <div className="hand text-accent-rose text-xl">
-          {esAdmin ? "mode administrador" : "editar record"}
-        </div>
+        <div className="hand text-accent-rose text-xl">editar record</div>
         <h1 className="font-serif text-4xl mt-1">Editar record</h1>
         <p className="text-sepia-500 mt-2">
           Fes els canvis que necessitis o esborra&apos;l del tot.
@@ -72,6 +70,7 @@ export default async function EditarPage({ params }: Props) {
         codi=""
         bucketPublicUrl={bucketPublicUrl}
         personesSuggerides={personesSuggerides ?? []}
+        nomUsuari={nomUsuari ?? ""}
       />
     </div>
   );

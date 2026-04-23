@@ -1,28 +1,28 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { obtenirNomUsuari } from "@/lib/auth";
+import { UserMenu } from "./UserMenu";
 
 export function Header() {
-  const esAdmin = cookies().get("eugeni_admin")?.value === "ok";
+  const nom = obtenirNomUsuari();
 
   return (
     <header className="sticky top-0 z-30 backdrop-blur bg-cream-50/80 border-b border-cream-200">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-rose to-sepia-400 grid place-items-center text-white font-serif text-lg shadow-soft">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-3">
+        <Link href="/" className="flex items-center gap-3 group min-w-0">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-rose to-sepia-400 grid place-items-center text-white font-serif text-lg shadow-soft shrink-0">
             E
           </div>
-          <div className="leading-tight">
-            <div className="font-serif text-xl text-sepia-700">30 anys d&apos;Eugeni</div>
-            <div className="hand text-accent-rose text-sm -mt-1">un àlbum col·lectiu</div>
+          <div className="leading-tight min-w-0">
+            <div className="font-serif text-xl text-sepia-700 truncate">
+              30 anys d&apos;Eugeni
+            </div>
+            <div className="hand text-accent-rose text-sm -mt-1 truncate">
+              un àlbum col·lectiu
+            </div>
           </div>
         </Link>
 
         <nav className="flex items-center gap-2">
-          {esAdmin && (
-            <Link href="/admin" className="ink-btn-outline">
-              Admin
-            </Link>
-          )}
           <Link href="/records" className="ink-btn-outline">
             <span className="hidden sm:inline">Els meus records</span>
             <span className="sm:hidden">Records</span>
@@ -34,6 +34,7 @@ export function Header() {
             <span className="hidden sm:inline">Afegir record</span>
             <span className="sm:hidden">Afegir</span>
           </Link>
+          {nom && <UserMenu nom={nom} />}
         </nav>
       </div>
     </header>

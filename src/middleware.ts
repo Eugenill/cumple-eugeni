@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/login", "/favicon.ico", "/_next", "/public"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/login",
+  "/api/logout",
+  "/favicon.ico",
+  "/_next",
+  "/public",
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -10,8 +17,9 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const cookie = req.cookies.get("eugeni_auth")?.value;
-  if (cookie === "ok") {
+  const auth = req.cookies.get("eugeni_auth")?.value;
+  const nom = req.cookies.get("eugeni_nom")?.value;
+  if (auth === "ok" && nom) {
     return NextResponse.next();
   }
 

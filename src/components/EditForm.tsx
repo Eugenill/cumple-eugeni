@@ -12,6 +12,8 @@ type Props = {
   codi: string;
   bucketPublicUrl: string;
   personesSuggerides: { id: string; nom: string }[];
+  /** Nom de la persona que hi ha la sessió oberta. */
+  nomUsuari?: string;
 };
 
 // Una foto pendent (triada amb "Afegir fotos") abans de ser pujada al servidor
@@ -26,12 +28,15 @@ export function EditForm({
   codi,
   bucketPublicUrl,
   personesSuggerides,
+  nomUsuari = "",
 }: Props) {
   const router = useRouter();
   const [titol, setTitol] = useState(moment.titol);
   const [descripcio, setDescripcio] = useState(moment.descripcio ?? "");
   const [data, setData] = useState(moment.data_moment);
-  const [pujatPer, setPujatPer] = useState(moment.pujat_per ?? "");
+  const [pujatPer, setPujatPer] = useState(
+    moment.pujat_per ?? nomUsuari ?? ""
+  );
   const [persones, setPersones] = useState<string[]>(
     moment.persones.map((p) => p.nom)
   );

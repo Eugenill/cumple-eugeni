@@ -1,5 +1,6 @@
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import { UploadForm } from "@/components/UploadForm";
+import { obtenirNomUsuari } from "@/lib/auth";
 
 export const revalidate = 0;
 
@@ -13,7 +14,10 @@ async function fetchPersones() {
 }
 
 export default async function PujarPage() {
-  const persones = await fetchPersones();
+  const [persones, nomUsuari] = await Promise.all([
+    fetchPersones(),
+    Promise.resolve(obtenirNomUsuari() ?? ""),
+  ]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -25,7 +29,7 @@ export default async function PujarPage() {
           S&apos;afegirà a la línia del temps de seguida.
         </p>
       </div>
-      <UploadForm personesSuggerides={persones} />
+      <UploadForm personesSuggerides={persones} nomUsuari={nomUsuari} />
     </div>
   );
 }

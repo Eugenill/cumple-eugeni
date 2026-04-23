@@ -14,16 +14,17 @@ type FotoPendent = {
 
 type Props = {
   personesSuggerides: PersonaSuggerida[];
+  /** Nom de la persona que hi ha la sessió oberta. S'utilitza com a "pujat_per". */
+  nomUsuari?: string;
 };
 
-export function UploadForm({ personesSuggerides }: Props) {
+export function UploadForm({ personesSuggerides, nomUsuari = "" }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [fotos, setFotos] = useState<FotoPendent[]>([]);
   const [fotoEnEdicio, setFotoEnEdicio] = useState<FotoPendent | null>(null);
   const [persones, setPersones] = useState<string[]>([]);
   const [novaPersona, setNovaPersona] = useState("");
-  const [pujatPer, setPujatPer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +97,7 @@ export function UploadForm({ personesSuggerides }: Props) {
     form.delete("fitxers");
     fotos.forEach((f) => form.append("fitxers", f.file, f.file.name));
     form.set("persones", persones.join(","));
-    form.set("pujat_per", pujatPer);
+    form.set("pujat_per", nomUsuari);
 
     try {
       const res = await fetch("/api/moments", { method: "POST", body: form });
@@ -306,52 +307,12 @@ export function UploadForm({ personesSuggerides }: Props) {
         />
       )}
 
-      <div>
-        <label className="label" htmlFor="pujat_per">Qui ho puja?</label>
-        <input
-          id="pujat_per"
-          value={pujatPer}
-          onChange={(e) => setPujatPer(e.target.value)}
-          className="input"
-          placeholder="El teu nom"
-          list="persones-pujades-per"
-        />
-        <datalist id="persones-pujades-per">
-          {personesSuggerides.map((p) => (
-            <option key={p.id} value={p.nom} />
-          ))}
-        </datalist>
-        {personesSuggerides.length > 0 && (
-          <div className="mt-2">
-            <div className="text-xs text-sepia-400 mb-1">
-              O tria ràpidament:
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {personesSuggerides.slice(0, 14).map((p) => {
-                const actiu = pujatPer.toLowerCase() === p.nom.toLowerCase();
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPujatPer(p.nom)}
-                    className={`chip transition ${
-                      actiu
-                        ? "bg-accent-rose/15 border-accent-rose/40 text-accent-rose"
-                        : "hover:bg-cream-200"
-                    }`}
-                  >
-                    {p.nom}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        <p className="text-xs text-sepia-400 mt-2">
-          El teu nom queda lligat a aquest record perquè més tard el puguis
-          editar o esborrar des de <span className="italic">Els meus records</span>.
-        </p>
-      </div>
+      {nomUsuari && (
+        <div className="text-xs text-sepia-400">
+          Aquest record quedarà signat per <strong>{nomUsuari}</strong> (tu) i
+          apareixerà automàticament a <span className="italic">Els meus records</span>.
+        </div>
+      )}
 
       {error && (
         <div className="bg-accent-rose/10 border border-accent-rose/30 text-accent-rose rounded-lg px-4 py-3 text-sm">
