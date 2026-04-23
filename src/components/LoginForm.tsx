@@ -68,9 +68,9 @@ function LoginFormInner({ persones }: Props) {
       <div className="card p-8 w-full max-w-md">
         <div className="text-center mb-6">
           <div className="hand text-accent-rose text-2xl">benvingut/da</div>
-          <h1 className="font-serif text-4xl">Un àlbum per a l&apos;Eugeni</h1>
+          <h1 className="font-serif text-4xl">Un àlbum dels 30 anys de l&apos;Eugeni</h1>
           <p className="text-sepia-500 mt-2">
-            30 anys mereixen 30 anys de records. Digues qui ets i introdueix
+            30 anys mereixen generen molts records. Digues qui ets i introdueix
             la contrasenya que t&apos;hem enviat per entrar.
           </p>
         </div>
