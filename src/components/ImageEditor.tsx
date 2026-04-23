@@ -7,22 +7,27 @@ import { getCroppedImage } from "@/lib/cropImage";
 
 type Props = {
   src: string;
-  momentId: string;
-  mitjaId: string;
-  codi?: string;
+  aspect?: number;
   onClose: () => void;
-  onSaved: (novaPath: string) => void;
+  /**
+   * Rep el resultat de l'enquadrat. Si la promesa es resol sense llançar,
+   * el modal es tanca automàticament; si llança, mostrem l'error i el
+   * modal queda obert.
+   */
+  onSave: (blob: Blob, dataUrl: string) => Promise<void> | void;
+  saveLabel?: string;
+  title?: string;
+  subtitle?: string;
 };
-
-const ASPECT = 4 / 3; // coincideix amb l'aspecte del polaroid del timeline
 
 export function ImageEditor({
   src,
-  momentId,
-  mitjaId,
-  codi,
+  aspect = 4 / 3,
   onClose,
-  onSaved,
+  onSave,
+  saveLabel = "Desar enquadrat",
+  title = "Ajusta l'enquadrat",
+  subtitle = "Mou, amplia i rota la imatge. A la dreta veuràs com quedarà al timeline.",
 }: Props) {
   const [crop, setCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -33,15 +38,13 @@ export function ImageEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Debounce lleuger per no generar el preview a cada moviment
   const debounceRef = useRef<number | null>(null);
 
   const onCropComplete = useCallback((_: Area, pixels: Area) => {
     setCroppedPixels(pixels);
   }, []);
 
-  // Cada cop que canvia el retall, generem un preview en JPEG
-  // a baixa qualitat perquè l'usuari vegi com quedarà al timeline.
+  // Cada cop que canvia el retall, generem un preview en JPEG a baixa qualitat.
   useEffect(() => {
     if (!croppedPixels) return;
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -76,28 +79,20 @@ export function ImageEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, saving]);
 
-  async function onSave() {
+  async function handleSaveClick() {
     if (!croppedPixels) return;
     setSaving(true);
     setError(null);
     try {
-      const { blob } = await getCroppedImage(
+      const { blob, dataUrl } = await getCroppedImage(
         src,
         croppedPixels,
         rotation,
         "image/jpeg",
         0.92
       );
-      const fd = new FormData();
-      fd.append("fitxer", blob, "enquadrat.jpg");
-
-      const url = `/api/moments/${momentId}/mitjans/${mitjaId}${
-        codi ? `?codi=${encodeURIComponent(codi)}` : ""
-      }`;
-      const res = await fetch(url, { method: "PUT", body: fd });
-      const dades = await res.json();
-      if (!res.ok) throw new Error(dades?.error || "No s'ha pogut desar");
-      onSaved(dades.path);
+      await onSave(blob, dataUrl);
+      onClose();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error inesperat";
       setError(msg);
@@ -138,13 +133,8 @@ export function ImageEditor({
         </button>
 
         <div className="hand text-accent-rose text-lg">editor d&apos;imatge</div>
-        <h3 className="font-serif text-2xl leading-tight pr-8">
-          Ajusta l&apos;enquadrat
-        </h3>
-        <p className="text-sepia-500 text-sm mt-1">
-          Mou, amplia i rota la imatge. A la dreta veuràs com quedarà al
-          timeline.
-        </p>
+        <h3 className="font-serif text-2xl leading-tight pr-8">{title}</h3>
+        <p className="text-sepia-500 text-sm mt-1">{subtitle}</p>
 
         <div className="grid md:grid-cols-[1fr_260px] gap-5 md:gap-6 mt-5">
           {/* Editor */}
@@ -158,7 +148,7 @@ export function ImageEditor({
                 crop={crop}
                 zoom={zoom}
                 rotation={rotation}
-                aspect={ASPECT}
+                aspect={aspect}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onRotationChange={setRotation}
@@ -259,11 +249,11 @@ export function ImageEditor({
           </button>
           <button
             type="button"
-            onClick={onSave}
+            onClick={handleSaveClick}
             disabled={saving || !croppedPixels}
             className="ink-btn flex-1 justify-center"
           >
-            {saving ? "Desant…" : "Desar enquadrat"}
+            {saving ? "Desant…" : saveLabel}
           </button>
         </div>
       </div>

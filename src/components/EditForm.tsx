@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MomentAmbRelacions } from "@/lib/utils";
 import { ImageEditor } from "./ImageEditor";
 
@@ -12,6 +12,13 @@ type Props = {
   codi: string;
   bucketPublicUrl: string;
   personesSuggerides: { id: string; nom: string }[];
+};
+
+// Una foto pendent (triada amb "Afegir fotos") abans de ser pujada al servidor
+type NovaFoto = {
+  localId: string;
+  file: File;
+  previewUrl: string; // objectURL del fitxer per mostrar la miniatura
 };
 
 export function EditForm({
@@ -34,12 +41,17 @@ export function EditForm({
   const [error, setError] = useState<string | null>(null);
   const [desat, setDesat] = useState(false);
 
-  // Estat per gestionar imatges (mitjans) individualment
+  // Mitjans ja existents al servidor
   const [mitjans, setMitjans] = useState<Mitja[]>(moment.mitjans);
   const [mitjaEnEdicio, setMitjaEnEdicio] = useState<Mitja | null>(null);
   const [esborrantId, setEsborrantId] = useState<string | null>(null);
-  // Bust de caché per forçar el refresc del preview després d'un enquadrat
   const [cacheBust, setCacheBust] = useState<Record<string, number>>({});
+
+  // Fotos noves pendents de pujar
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [novesFotos, setNovesFotos] = useState<NovaFoto[]>([]);
+  const [novaEnEdicio, setNovaEnEdicio] = useState<NovaFoto | null>(null);
+  const [pujantNoves, setPujantNoves] = useState(false);
 
   async function esborrarMitja(m: Mitja) {
     if (!confirm("Segur que vols esborrar aquesta imatge?")) return;
@@ -62,13 +74,88 @@ export function EditForm({
     }
   }
 
-  function onCropSaved(mitjaId: string, novaPath: string) {
+  async function desarEnquadrat(mitjaId: string, blob: Blob) {
+    const fd = new FormData();
+    fd.append("fitxer", blob, "enquadrat.jpg");
+    const url = `/api/moments/${moment.id}/mitjans/${mitjaId}${
+      codi ? `?codi=${encodeURIComponent(codi)}` : ""
+    }`;
+    const res = await fetch(url, { method: "PUT", body: fd });
+    const dades = await res.json();
+    if (!res.ok) throw new Error(dades?.error || "No s'ha pogut desar");
     setMitjans((prev) =>
-      prev.map((x) => (x.id === mitjaId ? { ...x, path: novaPath } : x))
+      prev.map((x) =>
+        x.id === mitjaId ? { ...x, path: dades.path as string } : x
+      )
     );
     setCacheBust((prev) => ({ ...prev, [mitjaId]: Date.now() }));
     setMitjaEnEdicio(null);
     router.refresh();
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const nous = Array.from(e.target.files || []).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    const mapped: NovaFoto[] = nous.map((f) => ({
+      localId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      file: f,
+      previewUrl: URL.createObjectURL(f),
+    }));
+    setNovesFotos((prev) => [...prev, ...mapped]);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function treureNovaFoto(localId: string) {
+    setNovesFotos((prev) => {
+      const trobat = prev.find((x) => x.localId === localId);
+      if (trobat) URL.revokeObjectURL(trobat.previewUrl);
+      return prev.filter((x) => x.localId !== localId);
+    });
+  }
+
+  function actualitzarNovaFoto(localId: string, blob: Blob) {
+    setNovesFotos((prev) =>
+      prev.map((x) => {
+        if (x.localId !== localId) return x;
+        URL.revokeObjectURL(x.previewUrl);
+        const nouFitxer = new File([blob], x.file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+          type: "image/jpeg",
+        });
+        return {
+          ...x,
+          file: nouFitxer,
+          previewUrl: URL.createObjectURL(nouFitxer),
+        };
+      })
+    );
+    setNovaEnEdicio(null);
+  }
+
+  async function pujarNovesFotos() {
+    if (novesFotos.length === 0) return;
+    setPujantNoves(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      novesFotos.forEach((n) => fd.append("fitxers", n.file, n.file.name));
+      const url = `/api/moments/${moment.id}/mitjans${
+        codi ? `?codi=${encodeURIComponent(codi)}` : ""
+      }`;
+      const res = await fetch(url, { method: "POST", body: fd });
+      const dades = await res.json();
+      if (!res.ok) throw new Error(dades?.error || "No s'han pogut pujar");
+      // Afegim al llistat existent i netejem les pendents
+      setMitjans((prev) => [...prev, ...(dades.mitjans as Mitja[])]);
+      novesFotos.forEach((n) => URL.revokeObjectURL(n.previewUrl));
+      setNovesFotos([]);
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error inesperat";
+      setError(msg);
+    } finally {
+      setPujantNoves(false);
+    }
   }
 
   function afegirPersona(nom: string) {
@@ -137,6 +224,7 @@ export function EditForm({
 
   return (
     <form onSubmit={onSubmit} className="card p-6 md:p-8 space-y-6">
+      {/* Galeria de fotos existents */}
       {mitjans.length > 0 && (
         <div>
           <label className="label">Fotos del record</label>
@@ -160,7 +248,6 @@ export function EditForm({
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  {/* Capa d'accions */}
                   <div className="absolute inset-0 bg-sepia-700/0 group-hover:bg-sepia-700/45 transition-colors grid place-items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-within:bg-sepia-700/45">
                     <div className="flex gap-2">
                       <button
@@ -192,14 +279,110 @@ export function EditForm({
         </div>
       )}
 
+      {/* Afegir noves fotos */}
+      <div>
+        <label className="label">Afegir fotos</label>
+        <div className="border-2 border-dashed border-cream-200 rounded-xl p-5 text-center bg-cream-50/50">
+          <input
+            ref={fileRef}
+            id="noves-fitxers"
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={onFileChange}
+            className="hidden"
+          />
+          <label htmlFor="noves-fitxers" className="ink-btn-outline cursor-pointer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Tria més fotos
+          </label>
+          <div className="text-xs text-sepia-400 mt-2">
+            Les fotos noves es pujaran quan premis &quot;Pujar fotos noves&quot;.
+          </div>
+        </div>
+
+        {novesFotos.length > 0 && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+              {novesFotos.map((n) => (
+                <div
+                  key={n.localId}
+                  className="relative group rounded-md overflow-hidden shadow-soft bg-sepia-100"
+                >
+                  <div className="aspect-[4/3]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={n.previewUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-sepia-700/0 group-hover:bg-sepia-700/45 transition-colors grid place-items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-within:bg-sepia-700/45">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNovaEnEdicio(n)}
+                        className="rounded-full px-3 py-1.5 text-sm bg-cream-50 text-sepia-700 hover:bg-cream-100 shadow-soft"
+                      >
+                        Enquadrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => treureNovaFoto(n.localId)}
+                        className="rounded-full px-3 py-1.5 text-sm bg-accent-rose text-white hover:bg-accent-rose/90 shadow-soft"
+                      >
+                        Treure
+                      </button>
+                    </div>
+                  </div>
+                  <div className="absolute top-1 left-1 hand text-[10px] bg-cream-50/85 text-sepia-600 rounded px-1.5 py-0.5">
+                    pendent
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end mt-3">
+              <button
+                type="button"
+                onClick={pujarNovesFotos}
+                disabled={pujantNoves}
+                className="ink-btn"
+              >
+                {pujantNoves
+                  ? "Pujant…"
+                  : `Pujar ${novesFotos.length} foto${
+                      novesFotos.length === 1 ? "" : "s"
+                    } nov${novesFotos.length === 1 ? "a" : "es"}`}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Editor per a mitjans existents al servidor */}
       {mitjaEnEdicio && (
         <ImageEditor
           src={`${bucketPublicUrl}/${mitjaEnEdicio.path}`}
-          momentId={moment.id}
-          mitjaId={mitjaEnEdicio.id}
-          codi={codi}
           onClose={() => setMitjaEnEdicio(null)}
-          onSaved={(novaPath) => onCropSaved(mitjaEnEdicio.id, novaPath)}
+          onSave={async (blob) => {
+            await desarEnquadrat(mitjaEnEdicio.id, blob);
+          }}
+        />
+      )}
+
+      {/* Editor per a fotos noves pendents */}
+      {novaEnEdicio && (
+        <ImageEditor
+          src={novaEnEdicio.previewUrl}
+          onClose={() => setNovaEnEdicio(null)}
+          onSave={(blob) => {
+            actualitzarNovaFoto(novaEnEdicio.localId, blob);
+          }}
+          saveLabel="Desar enquadrat"
         />
       )}
 

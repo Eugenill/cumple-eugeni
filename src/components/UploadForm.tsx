@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { ImageEditor } from "./ImageEditor";
 
 type PersonaSuggerida = { id: string; nom: string };
+
+type FotoPendent = {
+  localId: string;
+  file: File;
+  previewUrl: string;
+};
 
 type Props = {
   personesSuggerides: PersonaSuggerida[];
@@ -12,12 +19,21 @@ type Props = {
 export function UploadForm({ personesSuggerides }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [fitxers, setFitxers] = useState<File[]>([]);
+  const [fotos, setFotos] = useState<FotoPendent[]>([]);
+  const [fotoEnEdicio, setFotoEnEdicio] = useState<FotoPendent | null>(null);
   const [persones, setPersones] = useState<string[]>([]);
   const [novaPersona, setNovaPersona] = useState("");
   const [pujatPer, setPujatPer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Netegem els objectURLs quan el component es desmunta
+  useEffect(() => {
+    return () => {
+      fotos.forEach((f) => URL.revokeObjectURL(f.previewUrl));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function afegirPersona(nom: string) {
     const n = nom.trim();
@@ -35,12 +51,40 @@ export function UploadForm({ personesSuggerides }: Props) {
     const nous = Array.from(e.target.files || []).filter((f) =>
       f.type.startsWith("image/")
     );
-    setFitxers((prev) => [...prev, ...nous]);
+    const mapped: FotoPendent[] = nous.map((f) => ({
+      localId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      file: f,
+      previewUrl: URL.createObjectURL(f),
+    }));
+    setFotos((prev) => [...prev, ...mapped]);
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function treureFitxer(idx: number) {
-    setFitxers(fitxers.filter((_, i) => i !== idx));
+  function treureFoto(localId: string) {
+    setFotos((prev) => {
+      const trobat = prev.find((x) => x.localId === localId);
+      if (trobat) URL.revokeObjectURL(trobat.previewUrl);
+      return prev.filter((x) => x.localId !== localId);
+    });
+  }
+
+  function actualitzarFoto(localId: string, blob: Blob) {
+    setFotos((prev) =>
+      prev.map((x) => {
+        if (x.localId !== localId) return x;
+        URL.revokeObjectURL(x.previewUrl);
+        const nomBase = x.file.name.replace(/\.[^.]+$/, "");
+        const nouFitxer = new File([blob], `${nomBase}.jpg`, {
+          type: "image/jpeg",
+        });
+        return {
+          ...x,
+          file: nouFitxer,
+          previewUrl: URL.createObjectURL(nouFitxer),
+        };
+      })
+    );
+    setFotoEnEdicio(null);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -50,7 +94,7 @@ export function UploadForm({ personesSuggerides }: Props) {
 
     const form = new FormData(e.currentTarget);
     form.delete("fitxers");
-    fitxers.forEach((f) => form.append("fitxers", f));
+    fotos.forEach((f) => form.append("fitxers", f.file, f.file.name));
     form.set("persones", persones.join(","));
     form.set("pujat_per", pujatPer);
 
@@ -205,24 +249,62 @@ export function UploadForm({ personesSuggerides }: Props) {
           </div>
         </div>
 
-        {fitxers.length > 0 && (
-          <ul className="mt-3 space-y-1 text-sm">
-            {fitxers.map((f, i) => (
-              <li key={i} className="flex items-center justify-between bg-white/60 rounded px-3 py-1.5 border border-cream-200">
-                <span className="truncate">{f.name}</span>
-                <button
-                  type="button"
-                  onClick={() => treureFitxer(i)}
-                  className="text-sepia-400 hover:text-accent-rose ml-3"
-                  aria-label="Treure fitxer"
-                >
-                  ×
-                </button>
-              </li>
+        {fotos.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+            {fotos.map((f) => (
+              <div
+                key={f.localId}
+                className="relative group rounded-md overflow-hidden shadow-soft bg-sepia-100"
+              >
+                <div className="aspect-[4/3]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={f.previewUrl}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute inset-0 bg-sepia-700/0 group-hover:bg-sepia-700/45 transition-colors grid place-items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-within:bg-sepia-700/45">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFotoEnEdicio(f)}
+                      className="rounded-full px-3 py-1.5 text-sm bg-cream-50 text-sepia-700 hover:bg-cream-100 shadow-soft"
+                    >
+                      Enquadrar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => treureFoto(f.localId)}
+                      className="rounded-full px-3 py-1.5 text-sm bg-accent-rose text-white hover:bg-accent-rose/90 shadow-soft"
+                    >
+                      Treure
+                    </button>
+                  </div>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
+        )}
+
+        {fotos.length > 0 && (
+          <p className="text-xs text-sepia-400 mt-2">
+            Passa el cursor per sobre d&apos;una foto per retallar-la a 4:3 o
+            treure-la abans de pujar-la.
+          </p>
         )}
       </div>
+
+      {fotoEnEdicio && (
+        <ImageEditor
+          src={fotoEnEdicio.previewUrl}
+          onClose={() => setFotoEnEdicio(null)}
+          onSave={(blob) => {
+            actualitzarFoto(fotoEnEdicio.localId, blob);
+          }}
+          saveLabel="Desar enquadrat"
+        />
+      )}
 
       <div>
         <label className="label" htmlFor="pujat_per">Qui ho puja?</label>
