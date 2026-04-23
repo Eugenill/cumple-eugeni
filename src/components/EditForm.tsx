@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MomentAmbRelacions } from "@/lib/utils";
+import { ImageEditor } from "./ImageEditor";
+
+type Mitja = { id: string; path: string; tipus: "imatge" };
 
 type Props = {
   moment: MomentAmbRelacions;
@@ -30,6 +33,43 @@ export function EditForm({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [desat, setDesat] = useState(false);
+
+  // Estat per gestionar imatges (mitjans) individualment
+  const [mitjans, setMitjans] = useState<Mitja[]>(moment.mitjans);
+  const [mitjaEnEdicio, setMitjaEnEdicio] = useState<Mitja | null>(null);
+  const [esborrantId, setEsborrantId] = useState<string | null>(null);
+  // Bust de caché per forçar el refresc del preview després d'un enquadrat
+  const [cacheBust, setCacheBust] = useState<Record<string, number>>({});
+
+  async function esborrarMitja(m: Mitja) {
+    if (!confirm("Segur que vols esborrar aquesta imatge?")) return;
+    setEsborrantId(m.id);
+    setError(null);
+    try {
+      const url = `/api/moments/${moment.id}/mitjans/${m.id}${
+        codi ? `?codi=${encodeURIComponent(codi)}` : ""
+      }`;
+      const res = await fetch(url, { method: "DELETE" });
+      const dades = await res.json();
+      if (!res.ok) throw new Error(dades?.error || "No s'ha pogut esborrar");
+      setMitjans((prev) => prev.filter((x) => x.id !== m.id));
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error inesperat";
+      setError(msg);
+    } finally {
+      setEsborrantId(null);
+    }
+  }
+
+  function onCropSaved(mitjaId: string, novaPath: string) {
+    setMitjans((prev) =>
+      prev.map((x) => (x.id === mitjaId ? { ...x, path: novaPath } : x))
+    );
+    setCacheBust((prev) => ({ ...prev, [mitjaId]: Date.now() }));
+    setMitjaEnEdicio(null);
+    router.refresh();
+  }
 
   function afegirPersona(nom: string) {
     const n = nom.trim();
@@ -97,25 +137,70 @@ export function EditForm({
 
   return (
     <form onSubmit={onSubmit} className="card p-6 md:p-8 space-y-6">
-      {moment.mitjans.length > 0 && (
+      {mitjans.length > 0 && (
         <div>
           <label className="label">Fotos del record</label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {moment.mitjans.map((m) => (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                key={m.id}
-                src={`${bucketPublicUrl}/${m.path}`}
-                alt=""
-                className="aspect-square object-cover rounded-md shadow-soft"
-              />
-            ))}
+            {mitjans.map((m) => {
+              const bust = cacheBust[m.id];
+              const src = `${bucketPublicUrl}/${m.path}${
+                bust ? `?v=${bust}` : ""
+              }`;
+              const esborrant = esborrantId === m.id;
+              return (
+                <div
+                  key={m.id}
+                  className="relative group rounded-md overflow-hidden shadow-soft bg-sepia-100"
+                >
+                  <div className="aspect-[4/3]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  {/* Capa d'accions */}
+                  <div className="absolute inset-0 bg-sepia-700/0 group-hover:bg-sepia-700/45 transition-colors grid place-items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-within:bg-sepia-700/45">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMitjaEnEdicio(m)}
+                        disabled={esborrant}
+                        className="rounded-full px-3 py-1.5 text-sm bg-cream-50 text-sepia-700 hover:bg-cream-100 shadow-soft"
+                      >
+                        Enquadrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => esborrarMitja(m)}
+                        disabled={esborrant}
+                        className="rounded-full px-3 py-1.5 text-sm bg-accent-rose text-white hover:bg-accent-rose/90 shadow-soft disabled:opacity-50"
+                      >
+                        {esborrant ? "Esborrant…" : "Esborrar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <p className="text-xs text-sepia-400 mt-2">
-            Per ara no es poden afegir ni treure fotos individuals. Si vols
-            canviar les fotos, esborra el record i torna&apos;l a pujar.
+            Passa el cursor per sobre d&apos;una foto per retallar-la o
+            esborrar-la. L&apos;aspecte 4:3 és el que es veu al timeline.
           </p>
         </div>
+      )}
+
+      {mitjaEnEdicio && (
+        <ImageEditor
+          src={`${bucketPublicUrl}/${mitjaEnEdicio.path}`}
+          momentId={moment.id}
+          mitjaId={mitjaEnEdicio.id}
+          codi={codi}
+          onClose={() => setMitjaEnEdicio(null)}
+          onSaved={(novaPath) => onCropSaved(mitjaEnEdicio.id, novaPath)}
+        />
       )}
 
       <div className="grid md:grid-cols-2 gap-4">
