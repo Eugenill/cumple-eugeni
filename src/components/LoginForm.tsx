@@ -102,7 +102,7 @@ function LoginFormInner({ persones }: Props) {
                   O tria ràpidament:
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {persones.slice(0, 20).map((p) => {
+                  {persones.map((p) => {
                     const actiu =
                       nom.trim().toLowerCase() === p.nom.toLowerCase();
                     return (
