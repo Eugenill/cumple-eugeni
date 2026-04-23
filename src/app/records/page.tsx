@@ -25,8 +25,8 @@ export default async function RecordsPage() {
         <div className="hand text-accent-rose text-xl">els teus records</div>
         <h1 className="font-serif text-4xl md:text-5xl">Els meus records</h1>
         <p className="text-sepia-500 mt-2 max-w-xl mx-auto">
-          Tria el teu nom i veuràs els records que has pujat tu. Podràs
-          editar-los o esborrar-los quan vulguis.
+          Tria el teu nom i veuràs la teva línia del temps: tots els records
+          on hi surts o que has pujat tu.
         </p>
       </div>
 

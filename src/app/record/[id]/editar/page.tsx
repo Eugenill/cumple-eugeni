@@ -8,15 +8,12 @@ export const revalidate = 0;
 
 type Props = {
   params: { id: string };
-  searchParams: { codi?: string };
 };
 
-export default async function EditarPage({ params, searchParams }: Props) {
+export default async function EditarPage({ params }: Props) {
   const admin = createSupabaseAdminClient();
   const esAdmin = cookies().get("eugeni_admin")?.value === "ok";
-  const codi = searchParams.codi ?? "";
 
-  // Carreguem el moment amb el seu token per validar
   const { data: moment } = await admin
     .from("moments")
     .select("id, titol, descripcio, data_moment, pujat_per, edit_token, creat_el")
@@ -32,24 +29,6 @@ export default async function EditarPage({ params, searchParams }: Props) {
         </p>
         <Link href="/" className="ink-btn-outline mt-6 inline-flex">
           Tornar a la línia del temps
-        </Link>
-      </div>
-    );
-  }
-
-  const tokenCoincideix = moment.edit_token === codi;
-  if (!esAdmin && !tokenCoincideix) {
-    return (
-      <div className="card p-10 text-center">
-        <div className="hand text-accent-rose text-xl">uix…</div>
-        <h1 className="font-serif text-3xl mt-1">No pots editar aquest record</h1>
-        <p className="text-sepia-500 mt-2 max-w-md mx-auto">
-          Aquest enllaç no és vàlid o ha caducat. Només la persona que va
-          pujar el record (o l&apos;Eugeni amb contrasenya d&apos;admin) pot
-          modificar-lo.
-        </p>
-        <Link href="/" className="ink-btn-outline mt-6 inline-flex">
-          Tornar
         </Link>
       </div>
     );
@@ -80,7 +59,7 @@ export default async function EditarPage({ params, searchParams }: Props) {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="text-center">
         <div className="hand text-accent-rose text-xl">
-          {esAdmin ? "mode administrador" : "gestionar el teu record"}
+          {esAdmin ? "mode administrador" : "editar record"}
         </div>
         <h1 className="font-serif text-4xl mt-1">Editar record</h1>
         <p className="text-sepia-500 mt-2">
@@ -90,7 +69,7 @@ export default async function EditarPage({ params, searchParams }: Props) {
 
       <EditForm
         moment={dades}
-        codi={codi}
+        codi=""
         bucketPublicUrl={bucketPublicUrl}
         personesSuggerides={personesSuggerides ?? []}
       />

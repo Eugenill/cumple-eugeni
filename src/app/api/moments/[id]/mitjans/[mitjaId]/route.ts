@@ -1,51 +1,15 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createSupabaseAdminClient, BUCKET } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-async function verificarAcces(
-  req: Request,
-  momentId: string
-): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
-  const admin = createSupabaseAdminClient();
-
-  const esAdmin = cookies().get("eugeni_admin")?.value === "ok";
-  if (esAdmin) return { ok: true };
-
-  const url = new URL(req.url);
-  const codi = url.searchParams.get("codi") || req.headers.get("x-edit-codi");
-  if (!codi) {
-    return { ok: false, status: 403, error: "Falta el codi d'edició." };
-  }
-
-  const { data, error } = await admin
-    .from("moments")
-    .select("edit_token")
-    .eq("id", momentId)
-    .single();
-
-  if (error || !data) {
-    return { ok: false, status: 404, error: "No s'ha trobat el record." };
-  }
-  if (data.edit_token !== codi) {
-    return { ok: false, status: 403, error: "El codi no és correcte." };
-  }
-  return { ok: true };
-}
-
 // ---------- DELETE: esborra una imatge individual ----------
 export async function DELETE(
-  req: Request,
+  _req: Request,
   { params }: { params: { id: string; mitjaId: string } }
 ) {
-  const acc = await verificarAcces(req, params.id);
-  if (!acc.ok) {
-    return NextResponse.json({ error: acc.error }, { status: acc.status });
-  }
-
   const admin = createSupabaseAdminClient();
 
   const { data: mitja, error: mErr } = await admin
@@ -86,11 +50,6 @@ export async function PUT(
   req: Request,
   { params }: { params: { id: string; mitjaId: string } }
 ) {
-  const acc = await verificarAcces(req, params.id);
-  if (!acc.ok) {
-    return NextResponse.json({ error: acc.error }, { status: acc.status });
-  }
-
   const admin = createSupabaseAdminClient();
 
   const { data: mitja, error: mErr } = await admin
@@ -156,12 +115,10 @@ export async function PUT(
     .update({ path: novaPath })
     .eq("id", params.mitjaId);
   if (updErr) {
-    // Netegem la nova si la DB ha fallat
     await admin.storage.from(BUCKET).remove([novaPath]).catch(() => {});
     return NextResponse.json({ error: updErr.message }, { status: 500 });
   }
 
-  // Best-effort: esborrem l'antiga del Storage
   if (mitja.path && mitja.path !== novaPath) {
     await admin.storage.from(BUCKET).remove([mitja.path]).catch(() => {});
   }

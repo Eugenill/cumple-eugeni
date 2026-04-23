@@ -1,51 +1,13 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createSupabaseAdminClient, BUCKET } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
-
-async function verificarAcces(
-  req: Request,
-  id: string
-): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
-  const admin = createSupabaseAdminClient();
-
-  // Cookie d'admin → accés total
-  const esAdmin = cookies().get("eugeni_admin")?.value === "ok";
-  if (esAdmin) return { ok: true };
-
-  // Si no és admin, ha de dur el codi (edit_token)
-  const url = new URL(req.url);
-  const codi = url.searchParams.get("codi") || req.headers.get("x-edit-codi");
-  if (!codi) {
-    return { ok: false, status: 403, error: "Falta el codi d'edició." };
-  }
-
-  const { data, error } = await admin
-    .from("moments")
-    .select("edit_token")
-    .eq("id", id)
-    .single();
-
-  if (error || !data) {
-    return { ok: false, status: 404, error: "No s'ha trobat el record." };
-  }
-  if (data.edit_token !== codi) {
-    return { ok: false, status: 403, error: "El codi no és correcte." };
-  }
-  return { ok: true };
-}
 
 // ---------- PATCH ----------
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const acc = await verificarAcces(req, params.id);
-  if (!acc.ok) {
-    return NextResponse.json({ error: acc.error }, { status: acc.status });
-  }
-
   const admin = createSupabaseAdminClient();
   const body = await req.json().catch(() => ({}));
 
@@ -138,14 +100,9 @@ export async function PATCH(
 
 // ---------- DELETE ----------
 export async function DELETE(
-  req: Request,
+  _req: Request,
   { params }: { params: { id: string } }
 ) {
-  const acc = await verificarAcces(req, params.id);
-  if (!acc.ok) {
-    return NextResponse.json({ error: acc.error }, { status: acc.status });
-  }
-
   const admin = createSupabaseAdminClient();
 
   // 1. Llegim els fitxers a esborrar del Storage

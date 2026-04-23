@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { MomentAmbRelacions, formatDataCatala } from "@/lib/utils";
+import { MomentAmbRelacions } from "@/lib/utils";
+import { Timeline } from "./Timeline";
 
 type Props = {
   persones: { id: string; nom: string }[];
@@ -11,57 +11,33 @@ type Props = {
 };
 
 export function RecordsBrowser({ persones, moments, bucketPublicUrl }: Props) {
-  const router = useRouter();
   const [nom, setNom] = useState<string>("");
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  // Records pujats per aquesta persona.
-  const pujatsPerMi = useMemo(() => {
-    if (!nom.trim()) return [];
+  // Records on la persona apareix (tagejada) o que ha pujat ella mateixa.
+  const recordsMeus = useMemo(() => {
     const low = nom.trim().toLowerCase();
-    return moments.filter(
-      (m) => (m.pujat_per || "").trim().toLowerCase() === low
-    );
-  }, [moments, nom]);
-
-  const apareixoPero = useMemo(() => {
-    if (!nom.trim()) return [];
-    const low = nom.trim().toLowerCase();
-    return moments.filter(
-      (m) =>
-        (m.pujat_per || "").trim().toLowerCase() !== low &&
-        m.persones.some((p) => p.nom.toLowerCase() === low)
-    );
-  }, [moments, nom]);
-
-  async function obrirEditor(id: string) {
-    setLoadingId(id);
-    setError(null);
-    try {
-      const res = await fetch(`/api/moments/${id}/autoritza`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nom }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error || "No s'ha pogut autoritzar.");
-        setLoadingId(null);
-        return;
-      }
-      router.push(
-        `/record/${id}/editar?codi=${encodeURIComponent(data.edit_token)}`
+    if (!low) return [] as MomentAmbRelacions[];
+    return moments.filter((m) => {
+      const esAutor = (m.pujat_per || "").trim().toLowerCase() === low;
+      const estaTagejat = m.persones.some(
+        (p) => p.nom.toLowerCase() === low
       );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error inesperat";
-      setError(msg);
-      setLoadingId(null);
-    }
-  }
+      return esAutor || estaTagejat;
+    });
+  }, [moments, nom]);
+
+  const pujatsPerMi = useMemo(
+    () =>
+      recordsMeus.filter(
+        (m) => (m.pujat_per || "").trim().toLowerCase() === nom.trim().toLowerCase()
+      ).length,
+    [recordsMeus, nom]
+  );
+  const nomesTagejat = recordsMeus.length - pujatsPerMi;
+  const totalFotos = recordsMeus.reduce((s, m) => s + m.mitjans.length, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="card p-5">
         <label className="label" htmlFor="nom-select">
           Tria el teu nom
@@ -92,9 +68,7 @@ export function RecordsBrowser({ persones, moments, bucketPublicUrl }: Props) {
         </div>
         {persones.length > 0 && (
           <div className="mt-3">
-            <div className="text-xs text-sepia-400 mb-1">
-              O tria ràpidament:
-            </div>
+            <div className="text-xs text-sepia-400 mb-1">O tria ràpidament:</div>
             <div className="flex flex-wrap gap-1.5">
               {persones.map((p) => {
                 const actiu = nom.toLowerCase() === p.nom.toLowerCase();
@@ -118,95 +92,70 @@ export function RecordsBrowser({ persones, moments, bucketPublicUrl }: Props) {
         )}
       </div>
 
-      {error && (
-        <div className="bg-accent-rose/10 border border-accent-rose/30 text-accent-rose rounded-lg px-4 py-3 text-sm">
-          {error}
-        </div>
-      )}
-
       {!nom.trim() ? (
         <div className="card p-8 text-center">
           <div className="hand text-accent-rose text-xl">en espera…</div>
           <p className="text-sepia-500 mt-1">
-            Tria el teu nom a dalt per veure els teus records.
+            Tria el teu nom a dalt per veure la teva línia del temps.
           </p>
         </div>
-      ) : pujatsPerMi.length === 0 ? (
+      ) : recordsMeus.length === 0 ? (
         <div className="card p-8 text-center">
           <div className="hand text-accent-rose text-xl">encara res</div>
           <p className="text-sepia-500 mt-1">
-            No hi ha cap record pujat per <strong>{nom}</strong>. Si creus que
-            és un error, comprova que l&apos;has escrit igual que quan el vas
-            pujar (majúscules, accents…).
+            No hi ha cap record amb <strong>{nom}</strong> de moment. Comprova
+            que l&apos;has escrit igual que a la resta del lloc (majúscules,
+            accents…).
           </p>
-          {apareixoPero.length > 0 && (
-            <p className="text-xs text-sepia-400 mt-3">
-              Apareixes en {apareixoPero.length}{" "}
-              {apareixoPero.length === 1 ? "record" : "records"} pujats per
-              altres persones, però només qui els ha pujat els pot editar.
-            </p>
-          )}
         </div>
       ) : (
         <>
-          <div className="text-sm text-sepia-500">
-            {pujatsPerMi.length}{" "}
-            {pujatsPerMi.length === 1 ? "record" : "records"} pujats per{" "}
-            <strong>{nom}</strong>
-          </div>
-          <div className="card divide-y divide-cream-200">
-            {pujatsPerMi.map((m) => {
-              const primerMitja = m.mitjans[0];
-              const apareix = m.persones.some(
-                (p) => p.nom.toLowerCase() === nom.toLowerCase()
-              );
-              return (
-                <div key={m.id} className="flex items-center gap-4 p-4">
-                  <div className="w-16 h-16 rounded-md overflow-hidden bg-cream-100 shrink-0">
-                    {primerMitja ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={`${bucketPublicUrl}/${primerMitja.path}`}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full grid place-items-center text-sepia-400 hand">
-                        —
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-serif text-lg text-sepia-700 truncate">
-                      {m.titol}
-                    </div>
-                    <div className="text-xs text-sepia-400">
-                      {formatDataCatala(m.data_moment)}
-                      {" · "}
-                      {m.persones.length}{" "}
-                      {m.persones.length === 1 ? "persona" : "persones"}
-                      {" · "}
-                      {m.mitjans.length}{" "}
-                      {m.mitjans.length === 1 ? "foto" : "fotos"}
-                      {!apareix && (
-                        <span className="ml-2 italic text-accent-rose/70">
-                          (no t&apos;hi has tagejat)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => obrirEditor(m.id)}
-                    disabled={loadingId === m.id}
-                    className="ink-btn whitespace-nowrap"
-                  >
-                    {loadingId === m.id ? "Obrint…" : "Editar"}
-                  </button>
+          <section className="text-center">
+            <div className="hand text-accent-rose text-xl">la línia del temps de</div>
+            <h2 className="font-serif text-4xl md:text-5xl text-sepia-700">
+              {nom}
+            </h2>
+            <div className="flex justify-center gap-4 mt-5 flex-wrap">
+              <div className="card px-5 py-3">
+                <div className="font-serif text-3xl text-sepia-700">
+                  {recordsMeus.length}
                 </div>
-              );
-            })}
-          </div>
+                <div className="text-xs uppercase tracking-wider text-sepia-400">
+                  {recordsMeus.length === 1 ? "Record" : "Records"}
+                </div>
+              </div>
+              <div className="card px-5 py-3">
+                <div className="font-serif text-3xl text-sepia-700">
+                  {pujatsPerMi}
+                </div>
+                <div className="text-xs uppercase tracking-wider text-sepia-400">
+                  {pujatsPerMi === 1 ? "Pujat per tu" : "Pujats per tu"}
+                </div>
+              </div>
+              <div className="card px-5 py-3">
+                <div className="font-serif text-3xl text-sepia-700">
+                  {nomesTagejat}
+                </div>
+                <div className="text-xs uppercase tracking-wider text-sepia-400">
+                  Només tagejat
+                </div>
+              </div>
+              <div className="card px-5 py-3">
+                <div className="font-serif text-3xl text-sepia-700">
+                  {totalFotos}
+                </div>
+                <div className="text-xs uppercase tracking-wider text-sepia-400">
+                  {totalFotos === 1 ? "Foto" : "Fotos"}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <Timeline
+            moments={recordsMeus}
+            bucketPublicUrl={bucketPublicUrl}
+            personesSuggerides={persones}
+          />
         </>
       )}
     </div>
