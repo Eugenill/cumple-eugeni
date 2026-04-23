@@ -101,28 +101,16 @@ export function PeopleGraph({ moments }: Props) {
     const nodeMap = new Map<string, Node>();
     const linkMap = new Map<string, GraphLink>();
 
-    // Exclou l'Eugeni del graf: tot gira al seu voltant i no aporta
-    // informació addicional veure'l com a hub.
-    const excludedIds = new Set<string>();
     for (const m of moments) {
       for (const p of m.persones) {
-        if (p.nom.trim().toLowerCase() === "eugeni") {
-          excludedIds.add(p.id);
-        }
-      }
-    }
-
-    for (const m of moments) {
-      const visibles = m.persones.filter((p) => !excludedIds.has(p.id));
-      for (const p of visibles) {
         const existing = nodeMap.get(p.id);
         if (existing) existing.count++;
         else nodeMap.set(p.id, { id: p.id, nom: p.nom, count: 1 });
       }
-      for (let i = 0; i < visibles.length; i++) {
-        for (let j = i + 1; j < visibles.length; j++) {
-          const a = visibles[i].id;
-          const b = visibles[j].id;
+      for (let i = 0; i < m.persones.length; i++) {
+        for (let j = i + 1; j < m.persones.length; j++) {
+          const a = m.persones[i].id;
+          const b = m.persones[j].id;
           const key = a < b ? `${a}|${b}` : `${b}|${a}`;
           const existing = linkMap.get(key);
           if (existing) existing.value++;
@@ -195,18 +183,16 @@ export function PeopleGraph({ moments }: Props) {
     );
   }
 
-  // Format ample i baix (el·lipse horitzontal) en comptes de cercle.
-  const h = Math.max(340, Math.min(500, Math.round(w * 0.45)));
+  // Sense el marc, podem ser més generosos amb l'alçada.
+  const h = Math.max(420, Math.min(620, Math.round(w * 0.6)));
   const cx = w / 2;
   const cy = h / 2;
   const maxCount = Math.max(...nodes.map((n) => n.count), 1);
 
-  // Radis de l'el·lipse (rx >> ry per un aspecte clarament ample).
-  const padX = 60;
-  const padY = 60;
-  const rx = Math.max(120, w / 2 - padX);
-  const ry = Math.max(70, h / 2 - padY);
+  const radius = Math.min(w, h) * 0.38;
 
+  // Amplitud de moviment: una mica més gran pel centre (és més gran),
+  // i una mica menor per l'activa (per llegibilitat sobre el text).
   type Pos = {
     x: number;
     y: number;
@@ -216,24 +202,36 @@ export function PeopleGraph({ moments }: Props) {
   };
   const positions = new Map<string, Pos>();
 
-  if (nodes.length === 1) {
-    const only = nodes[0];
-    const d = drift(only.id, t, 4);
-    positions.set(only.id, {
+  const [centre, ...resta] = nodes;
+
+  // Node central: drift lleuger
+  {
+    const d = drift(centre.id, t, 3);
+    positions.set(centre.id, {
       x: cx + d.dx,
       y: cy + d.dy,
-      r: 12 + (only.count / maxCount) * 10,
-      nom: only.nom,
-      count: only.count,
+      r: 14 + (centre.count / maxCount) * 10,
+      nom: centre.nom,
+      count: centre.count,
+    });
+  }
+
+  if (resta.length === 1) {
+    const d = drift(resta[0].id, t, 5);
+    positions.set(resta[0].id, {
+      x: cx + radius + d.dx,
+      y: cy + d.dy,
+      r: 10 + (resta[0].count / maxCount) * 10,
+      nom: resta[0].nom,
+      count: resta[0].count,
     });
   } else {
-    // Tots els nodes distribuïts al voltant de l'el·lipse.
-    nodes.forEach((n, i) => {
-      const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
+    resta.forEach((n, i) => {
+      const angle = (i / resta.length) * Math.PI * 2 - Math.PI / 2;
       const d = drift(n.id, t, 5);
       positions.set(n.id, {
-        x: cx + Math.cos(angle) * rx + d.dx,
-        y: cy + Math.sin(angle) * ry + d.dy,
+        x: cx + Math.cos(angle) * radius + d.dx,
+        y: cy + Math.sin(angle) * radius + d.dy,
         r: 8 + (n.count / maxCount) * 10,
         nom: n.nom,
         count: n.count,
