@@ -10,6 +10,8 @@ type Props = {
   bucketPublicUrl: string;
   /** Nom pre-seleccionat (pres de la sessió). */
   nomInicial?: string;
+  /** Nom de l'usuari autenticat — per a les reaccions. */
+  nomUsuari?: string;
 };
 
 export function RecordsBrowser({
@@ -17,6 +19,7 @@ export function RecordsBrowser({
   moments,
   bucketPublicUrl,
   nomInicial = "",
+  nomUsuari = "",
 }: Props) {
   const [nom, setNom] = useState<string>(nomInicial);
   const [canviant, setCanviant] = useState<boolean>(!nomInicial);
@@ -184,6 +187,7 @@ export function RecordsBrowser({
             moments={recordsMeus}
             bucketPublicUrl={bucketPublicUrl}
             personesSuggerides={persones}
+            nomUsuari={nomUsuari}
           />
         </>
       )}

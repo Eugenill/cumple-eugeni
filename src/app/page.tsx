@@ -2,6 +2,7 @@ import { createSupabasePublicClient, BUCKET } from "@/lib/supabase/server";
 import { MomentAmbRelacions } from "@/lib/utils";
 import { Timeline } from "@/components/Timeline";
 import { PeopleGraph } from "@/components/PeopleGraph";
+import { obtenirNomUsuari } from "@/lib/auth";
 import Link from "next/link";
 
 export const revalidate = 0;
@@ -34,6 +35,7 @@ export default async function HomePage() {
     fetchPersones(),
   ]);
   const bucketPublicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}`;
+  const nomUsuari = obtenirNomUsuari() ?? "";
 
   const totalMoments = moments.length;
   const totalPersones = new Set(
@@ -84,6 +86,7 @@ export default async function HomePage() {
           moments={moments}
           bucketPublicUrl={bucketPublicUrl}
           personesSuggerides={persones}
+          nomUsuari={nomUsuari}
         />
       </section>
     </div>

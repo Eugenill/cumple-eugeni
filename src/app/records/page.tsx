@@ -35,6 +35,7 @@ export default async function RecordsPage() {
         moments={(moments ?? []) as MomentAmbRelacions[]}
         bucketPublicUrl={bucketPublicUrl}
         nomInicial={nomUsuari}
+        nomUsuari={nomUsuari}
       />
     </div>
   );

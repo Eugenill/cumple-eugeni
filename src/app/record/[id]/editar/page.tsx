@@ -45,6 +45,7 @@ export default async function EditarPage({ params }: Props) {
     ...moment,
     persones: [],
     mitjans: [],
+    reaccions: [],
   }) as MomentAmbRelacions;
 
   // Totes les persones conegudes (per suggerir)

@@ -1,17 +1,21 @@
 import { MomentAmbRelacions, formatDataCatala, obtenirAny } from "@/lib/utils";
 import { MomentCard } from "./MomentCard";
 import { EditRecordButton } from "./EditRecordButton";
+import { Reactions } from "./Reactions";
 
 type Props = {
   moments: MomentAmbRelacions[];
   bucketPublicUrl: string;
   personesSuggerides?: { id: string; nom: string }[];
+  /** Nom de l'usuari autenticat — utilitzat per les reaccions. */
+  nomUsuari?: string;
 };
 
 export function Timeline({
   moments,
   bucketPublicUrl,
   personesSuggerides = [],
+  nomUsuari = "",
 }: Props) {
   if (moments.length === 0) {
     return (
@@ -87,6 +91,14 @@ export function Timeline({
                             {p.nom}
                           </span>
                         ))}
+                      </div>
+                      <div className={`mt-3 ${esquerra ? "md:flex md:justify-end" : ""}`}>
+                        <Reactions
+                          momentId={m.id}
+                          reaccions={m.reaccions ?? []}
+                          nomUsuari={nomUsuari}
+                          align={esquerra ? "right" : "left"}
+                        />
                       </div>
                       <div
                         className={`text-xs text-sepia-400 mt-3 flex items-center gap-3 ${

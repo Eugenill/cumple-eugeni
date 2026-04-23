@@ -60,6 +60,25 @@ create table if not exists public.moment_persones (
 create index if not exists moment_persones_persona_idx on public.moment_persones (persona_id);
 
 -- =========================================================
+-- Taula: reaccions (emojis que la gent deixa a un moment)
+-- Una persona (per nom) pot posar cada emoji un sol cop
+-- per moment. Es fa servir `lower(persona_nom)` per ser
+-- insensible a majúscules.
+-- =========================================================
+create table if not exists public.reaccions (
+  id uuid primary key default gen_random_uuid(),
+  moment_id uuid not null references public.moments(id) on delete cascade,
+  persona_nom text not null,
+  emoji text not null,
+  creat_el timestamptz not null default now()
+);
+
+create unique index if not exists reaccions_unique_idx
+  on public.reaccions (moment_id, lower(persona_nom), emoji);
+
+create index if not exists reaccions_moment_idx on public.reaccions (moment_id);
+
+-- =========================================================
 -- Row Level Security
 -- L'app fa les escriptures amb la service_role (server-side)
 -- i les lectures amb la anon key, així que:
@@ -70,16 +89,19 @@ alter table public.persones enable row level security;
 alter table public.moments enable row level security;
 alter table public.mitjans enable row level security;
 alter table public.moment_persones enable row level security;
+alter table public.reaccions enable row level security;
 
 drop policy if exists "llegir persones" on public.persones;
 drop policy if exists "llegir moments" on public.moments;
 drop policy if exists "llegir mitjans" on public.mitjans;
 drop policy if exists "llegir moment_persones" on public.moment_persones;
+drop policy if exists "llegir reaccions" on public.reaccions;
 
 create policy "llegir persones" on public.persones for select using (true);
 create policy "llegir moments" on public.moments for select using (true);
 create policy "llegir mitjans" on public.mitjans for select using (true);
 create policy "llegir moment_persones" on public.moment_persones for select using (true);
+create policy "llegir reaccions" on public.reaccions for select using (true);
 
 -- =========================================================
 -- Vista pràctica: moments amb persones i mitjans agregats
@@ -102,7 +124,12 @@ select
     (select json_agg(json_build_object('id', mi.id, 'path', mi.path, 'tipus', mi.tipus) order by mi.ordre)
      from public.mitjans mi
      where mi.moment_id = m.id), '[]'::json
-  ) as mitjans
+  ) as mitjans,
+  coalesce(
+    (select json_agg(json_build_object('emoji', re.emoji, 'persona_nom', re.persona_nom) order by re.creat_el)
+     from public.reaccions re
+     where re.moment_id = m.id), '[]'::json
+  ) as reaccions
 from public.moments m;
 
 -- =========================================================

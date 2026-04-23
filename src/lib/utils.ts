@@ -34,6 +34,8 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+export type Reaccio = { emoji: string; persona_nom: string };
+
 export type MomentAmbRelacions = {
   id: string;
   titol: string;
@@ -43,4 +45,5 @@ export type MomentAmbRelacions = {
   creat_el: string;
   persones: { id: string; nom: string }[];
   mitjans: { id: string; path: string; tipus: "imatge" }[];
+  reaccions: Reaccio[];
 };

@@ -74,6 +74,15 @@
   }
 }
 
+/* Amaga la scrollbar però manté el scroll (per al carrusel de fotos) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Timeline rail */
 .rail {
   position: absolute;

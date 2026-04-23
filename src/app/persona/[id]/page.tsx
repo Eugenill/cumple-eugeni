@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createSupabasePublicClient, BUCKET } from "@/lib/supabase/server";
 import { Timeline } from "@/components/Timeline";
 import { MomentAmbRelacions } from "@/lib/utils";
+import { obtenirNomUsuari } from "@/lib/auth";
 
 export const revalidate = 0;
 
@@ -54,6 +55,7 @@ export default async function PersonaPage({
   );
 
   const bucketPublicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}`;
+  const nomUsuari = obtenirNomUsuari() ?? "";
 
   const totalFotos = moments.reduce((s, m) => s + m.mitjans.length, 0);
 
@@ -135,6 +137,7 @@ export default async function PersonaPage({
             moments={moments}
             bucketPublicUrl={bucketPublicUrl}
             personesSuggerides={totesPersones ?? []}
+            nomUsuari={nomUsuari}
           />
         )}
       </section>
