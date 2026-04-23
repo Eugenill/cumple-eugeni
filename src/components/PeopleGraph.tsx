@@ -20,7 +20,7 @@ type GraphLink = {
   value: number;
 };
 
-const HOVER_DELAY_MS = 1000;
+const HOVER_DELAY_MS = 500;
 const CLOSE_GRACE_MS = 180;
 
 // --- utilitats de moviment ---
