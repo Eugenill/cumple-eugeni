@@ -2,6 +2,8 @@ import { MomentAmbRelacions, formatDataCatala, obtenirAny } from "@/lib/utils";
 import { MomentCard } from "./MomentCard";
 import { EditRecordButton } from "./EditRecordButton";
 import { Reactions } from "./Reactions";
+import { YearNavigator } from "./YearNavigator";
+import { BackToTop } from "./BackToTop";
 
 type Props = {
   moments: MomentAmbRelacions[];
@@ -46,84 +48,105 @@ export function Timeline({
   }
 
   const anysOrdenats = Array.from(grups.keys()).sort((a, b) => b - a);
+  const recomptes = Object.fromEntries(
+    anysOrdenats.map((a) => [a, grups.get(a)!.length])
+  );
 
   return (
-    <div className="relative">
-      <div className="rail" aria-hidden />
-      <div className="space-y-16 md:space-y-20 relative">
-        {anysOrdenats.map((any) => (
-          <section key={any}>
-            <div className="flex md:justify-center mb-8 md:mb-10">
-              <div className="ml-10 md:ml-0 bg-sepia-600 text-cream-50 rounded-full px-5 py-1.5 font-serif text-xl shadow-soft">
-                {any}
-              </div>
-            </div>
+    <div>
+      <YearNavigator anys={anysOrdenats} recomptes={recomptes} />
 
-            <div className="space-y-10 md:space-y-14">
-              {grups.get(any)!.map((m, idx) => {
-                const esquerra = idx % 2 === 0;
-                return (
-                  <div
-                    key={m.id}
-                    className="relative grid md:grid-cols-2 gap-6 md:gap-10 items-start"
-                  >
-                    {/* Dot sobre la via */}
-                    <div
-                      className="absolute left-5 md:left-1/2 -translate-x-1/2 top-5 w-3 h-3 rounded-full bg-accent-rose ring-4 ring-cream-50 shadow z-10"
-                      aria-hidden
-                    />
-
-                    <div className={`pl-10 md:pl-0 ${esquerra ? "md:order-1 md:text-right" : "md:order-2"}`}>
-                      <div className="hand text-accent-rose text-xl">
-                        {formatDataCatala(m.data_moment)}
-                      </div>
-                      <h3 className="font-serif text-2xl md:text-3xl leading-tight mt-1">
-                        {m.titol}
-                      </h3>
-                      {m.descripcio && (
-                        <p className="text-sepia-500 mt-2 leading-relaxed">
-                          {m.descripcio}
-                        </p>
-                      )}
-                      <div className={`flex flex-wrap gap-1.5 mt-3 ${esquerra ? "md:justify-end" : ""}`}>
-                        {m.persones.map((p) => (
-                          <span key={p.id} className="chip">
-                            {p.nom}
-                          </span>
-                        ))}
-                      </div>
-                      <div className={`mt-3 ${esquerra ? "md:flex md:justify-end" : ""}`}>
-                        <Reactions
-                          momentId={m.id}
-                          reaccions={m.reaccions ?? []}
-                          nomUsuari={nomUsuari}
-                          align={esquerra ? "right" : "left"}
-                        />
-                      </div>
-                      <div
-                        className={`text-xs text-sepia-400 mt-3 flex items-center gap-3 ${
-                          esquerra ? "md:justify-end" : ""
-                        }`}
-                      >
-                        {m.pujat_per && <span>Pujat per {m.pujat_per}</span>}
-                        <EditRecordButton
-                          momentId={m.id}
-                          personesSuggerides={personesSuggerides}
-                          label="Editar"
-                        />
-                      </div>
-                    </div>
-
-                    <div className={`pl-10 md:pl-0 ${esquerra ? "md:order-2" : "md:order-1"}`}>
-                      <MomentCard moment={m} bucketPublicUrl={bucketPublicUrl} />
-                    </div>
+      <div className="relative mt-4">
+        <div className="rail" aria-hidden />
+        <div className="space-y-16 md:space-y-20 relative">
+          {anysOrdenats.map((any) => {
+            const n = grups.get(any)!.length;
+            return (
+              <section
+                key={any}
+                id={`any-${any}`}
+                // Offset perquè el scroll amb ancora no quedi amagat sota el
+                // header + el ribbon enganxat.
+                style={{ scrollMarginTop: 120 }}
+              >
+                <div className="flex md:justify-center mb-8 md:mb-10">
+                  <div className="ml-10 md:ml-0 bg-sepia-600 text-cream-50 rounded-full px-5 py-1.5 font-serif text-xl shadow-soft inline-flex items-center gap-2">
+                    <span>{any}</span>
+                    <span className="text-[11px] font-sans font-normal bg-cream-50/20 rounded-full px-2 py-0 tabular-nums">
+                      {n} {n === 1 ? "record" : "records"}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                </div>
+
+                <div className="space-y-10 md:space-y-14">
+                  {grups.get(any)!.map((m, idx) => {
+                    const esquerra = idx % 2 === 0;
+                    return (
+                      <div
+                        key={m.id}
+                        className="relative grid md:grid-cols-2 gap-6 md:gap-10 items-start"
+                      >
+                        {/* Dot sobre la via */}
+                        <div
+                          className="absolute left-5 md:left-1/2 -translate-x-1/2 top-5 w-3 h-3 rounded-full bg-accent-rose ring-4 ring-cream-50 shadow z-10"
+                          aria-hidden
+                        />
+
+                        <div className={`pl-10 md:pl-0 ${esquerra ? "md:order-1 md:text-right" : "md:order-2"}`}>
+                          <div className="hand text-accent-rose text-xl">
+                            {formatDataCatala(m.data_moment)}
+                          </div>
+                          <h3 className="font-serif text-2xl md:text-3xl leading-tight mt-1">
+                            {m.titol}
+                          </h3>
+                          {m.descripcio && (
+                            <p className="text-sepia-500 mt-2 leading-relaxed">
+                              {m.descripcio}
+                            </p>
+                          )}
+                          <div className={`flex flex-wrap gap-1.5 mt-3 ${esquerra ? "md:justify-end" : ""}`}>
+                            {m.persones.map((p) => (
+                              <span key={p.id} className="chip">
+                                {p.nom}
+                              </span>
+                            ))}
+                          </div>
+                          <div className={`mt-3 ${esquerra ? "md:flex md:justify-end" : ""}`}>
+                            <Reactions
+                              momentId={m.id}
+                              reaccions={m.reaccions ?? []}
+                              nomUsuari={nomUsuari}
+                              align={esquerra ? "right" : "left"}
+                            />
+                          </div>
+                          <div
+                            className={`text-xs text-sepia-400 mt-3 flex items-center gap-3 ${
+                              esquerra ? "md:justify-end" : ""
+                            }`}
+                          >
+                            {m.pujat_per && <span>Pujat per {m.pujat_per}</span>}
+                            <EditRecordButton
+                              momentId={m.id}
+                              personesSuggerides={personesSuggerides}
+                              label="Editar"
+                            />
+                          </div>
+                        </div>
+
+                        <div className={`pl-10 md:pl-0 ${esquerra ? "md:order-2" : "md:order-1"}`}>
+                          <MomentCard moment={m} bucketPublicUrl={bucketPublicUrl} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </div>
+
+      <BackToTop />
     </div>
   );
 }
