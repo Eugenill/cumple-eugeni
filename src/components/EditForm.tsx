@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { MomentAmbRelacions } from "@/lib/utils";
 import { ImageEditor } from "./ImageEditor";
+import { resizeImageFile } from "@/lib/imageResize";
 
 type Mitja = { id: string; path: string; tipus: "imatge" };
 
@@ -142,21 +143,54 @@ export function EditForm({
     setPujantNoves(true);
     setError(null);
     try {
+      // Optimitzem cada foto al navegador per no superar el límit de
+      // mida de Vercel (~4.5 MB per request).
+      const fitxers = await Promise.all(
+        novesFotos.map((n) => resizeImageFile(n.file))
+      );
+
       const fd = new FormData();
-      novesFotos.forEach((n) => fd.append("fitxers", n.file, n.file.name));
+      fitxers.forEach((f) => fd.append("fitxers", f, f.name));
       const url = `/api/moments/${moment.id}/mitjans${
         codi ? `?codi=${encodeURIComponent(codi)}` : ""
       }`;
       const res = await fetch(url, { method: "POST", body: fd });
+
+      if (!res.ok) {
+        let serverMsg: string | null = null;
+        try {
+          const dades = await res.clone().json();
+          serverMsg = dades?.error ?? null;
+        } catch {
+          try {
+            const txt = (await res.text()).trim();
+            serverMsg = txt && txt.length < 200 ? txt : null;
+          } catch {
+            // ignore
+          }
+        }
+        if (res.status === 413) {
+          throw new Error(
+            "Les fotos són massa grosses per pujar-les juntes. Prova de pujar-ne menys de cop."
+          );
+        }
+        throw new Error(
+          serverMsg || `No s'han pogut pujar les fotos (${res.status}).`
+        );
+      }
+
       const dades = await res.json();
-      if (!res.ok) throw new Error(dades?.error || "No s'han pogut pujar");
       // Afegim al llistat existent i netejem les pendents
       setMitjans((prev) => [...prev, ...(dades.mitjans as Mitja[])]);
       novesFotos.forEach((n) => URL.revokeObjectURL(n.previewUrl));
       setNovesFotos([]);
       router.refresh();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error inesperat";
+      let msg = err instanceof Error ? err.message : "Error inesperat";
+      if (/did not match the expected pattern/i.test(msg)) {
+        msg =
+          "Hi ha hagut un problema pujant les fotos (potser són massa grosses o la xarxa ha fallat). Prova-ho de nou.";
+      }
       setError(msg);
     } finally {
       setPujantNoves(false);

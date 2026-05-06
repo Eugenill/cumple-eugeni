@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ImageEditor } from "./ImageEditor";
+import { resizeImageFile } from "@/lib/imageResize";
 
 type PersonaSuggerida = { id: string; nom: string };
 
@@ -26,6 +27,9 @@ export function UploadForm({ personesSuggerides, nomUsuari = "" }: Props) {
   const [persones, setPersones] = useState<string[]>([]);
   const [novaPersona, setNovaPersona] = useState("");
   const [loading, setLoading] = useState(false);
+  const [estatPujada, setEstatPujada] = useState<
+    "idle" | "optimitzant" | "pujant"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
 
   // Netegem els objectURLs quan el component es desmunta
@@ -95,21 +99,78 @@ export function UploadForm({ personesSuggerides, nomUsuari = "" }: Props) {
 
     const form = new FormData(e.currentTarget);
     form.delete("fitxers");
-    fotos.forEach((f) => form.append("fitxers", f.file, f.file.name));
+
+    // 1) Optimitzem cada imatge al navegador per evitar pujades
+    //    massa grans (Vercel té un límit de ~4.5 MB per request).
+    setEstatPujada("optimitzant");
+    let fitxersOptimitzats: File[] = [];
+    try {
+      fitxersOptimitzats = await Promise.all(
+        fotos.map((f) => resizeImageFile(f.file))
+      );
+    } catch {
+      fitxersOptimitzats = fotos.map((f) => f.file);
+    }
+    fitxersOptimitzats.forEach((f) =>
+      form.append("fitxers", f, f.name)
+    );
     form.set("persones", persones.join(","));
     form.set("pujat_per", nomUsuari);
 
+    setEstatPujada("pujant");
     try {
-      const res = await fetch("/api/moments", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Error al pujar");
+      const res = await fetch("/api/moments", {
+        method: "POST",
+        body: form,
+      });
+
+      if (!res.ok) {
+        // Intentem llegir un missatge útil del servidor sense petar
+        // si la resposta no és JSON (Vercel pot tornar HTML/buit).
+        let serverMsg: string | null = null;
+        try {
+          const data = await res.clone().json();
+          serverMsg = data?.error ?? null;
+        } catch {
+          try {
+            const txt = (await res.text()).trim();
+            serverMsg = txt && txt.length < 200 ? txt : null;
+          } catch {
+            // ignore
+          }
+        }
+
+        if (res.status === 413) {
+          throw new Error(
+            "Les fotos són massa grosses per pujar-les juntes. Prova de pujar-ne menys de cop o de mida més petita."
+          );
+        }
+        throw new Error(
+          serverMsg || `No s'ha pogut pujar el record (${res.status}).`
+        );
+      }
+
+      // OK — alguns 200 poden no portar JSON, no passa res.
+      try {
+        await res.json();
+      } catch {
+        // ignore
+      }
+
       // Tornem a la home directament — la línia del temps mostrarà el nou record.
       router.push("/");
       router.refresh();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error inesperat";
+      let msg = err instanceof Error ? err.message : "Error inesperat";
+      // El típic missatge críptic de Safari iOS quan res.json() falla
+      // amb una resposta buida → el reescrivim a alguna cosa útil.
+      if (/did not match the expected pattern/i.test(msg)) {
+        msg =
+          "Hi ha hagut un problema pujant les fotos (potser són massa grosses o la xarxa ha fallat). Prova-ho de nou.";
+      }
       setError(msg);
       setLoading(false);
+      setEstatPujada("idle");
     }
   }
 
@@ -322,7 +383,11 @@ export function UploadForm({ personesSuggerides, nomUsuari = "" }: Props) {
 
       <div className="flex items-center justify-end gap-3">
         <button type="submit" disabled={loading} className="ink-btn">
-          {loading ? "Pujant…" : "Afegir record"}
+          {estatPujada === "optimitzant"
+            ? "Optimitzant fotos…"
+            : estatPujada === "pujant"
+            ? "Pujant…"
+            : "Afegir record"}
         </button>
       </div>
     </form>
