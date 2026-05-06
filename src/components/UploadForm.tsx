@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ImageEditor } from "./ImageEditor";
-import { resizeImageFile } from "@/lib/imageResize";
+import { resizeImageFileDetallat } from "@/lib/imageResize";
 
 type PersonaSuggerida = { id: string; nom: string };
 
@@ -103,17 +103,37 @@ export function UploadForm({ personesSuggerides, nomUsuari = "" }: Props) {
     // 1) Optimitzem cada imatge al navegador per evitar pujades
     //    massa grans (Vercel té un límit de ~4.5 MB per request).
     setEstatPujada("optimitzant");
-    let fitxersOptimitzats: File[] = [];
+    let resultats: Awaited<ReturnType<typeof resizeImageFileDetallat>>[] = [];
     try {
-      fitxersOptimitzats = await Promise.all(
-        fotos.map((f) => resizeImageFile(f.file))
+      resultats = await Promise.all(
+        fotos.map((f) => resizeImageFileDetallat(f.file))
       );
     } catch {
-      fitxersOptimitzats = fotos.map((f) => f.file);
+      resultats = fotos.map((f) => ({
+        file: f.file,
+        unprocessed: true,
+        esHeic: false,
+      }));
     }
-    fitxersOptimitzats.forEach((f) =>
-      form.append("fitxers", f, f.name)
+
+    // Si una foto és HEIC i el navegador no l'ha pogut descodificar,
+    // segurament és iOS antic. La pujada real fallaria silenciosament,
+    // així que avisem ja aquí.
+    const heicNoConvertit = resultats.find(
+      (r) => r.unprocessed && r.esHeic && r.file.size > 3.5 * 1024 * 1024
     );
+    if (heicNoConvertit) {
+      setError(
+        "Una de les fotos és en format HEIC i és massa gran per pujar-la directament. Al teu iPhone: Configuració → Càmera → Formats → tria \"Més compatible\" i fes la foto de nou (o tria-la des de Fotos amb \"Editar\" i exporta-la com a JPEG)."
+      );
+      setLoading(false);
+      setEstatPujada("idle");
+      return;
+    }
+
+    resultats
+      .map((r) => r.file)
+      .forEach((f) => form.append("fitxers", f, f.name));
     form.set("persones", persones.join(","));
     form.set("pujat_per", nomUsuari);
 

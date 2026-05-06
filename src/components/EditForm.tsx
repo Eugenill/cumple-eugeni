@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { MomentAmbRelacions } from "@/lib/utils";
 import { ImageEditor } from "./ImageEditor";
-import { resizeImageFile } from "@/lib/imageResize";
+import { resizeImageFileDetallat } from "@/lib/imageResize";
 
 type Mitja = { id: string; path: string; tipus: "imatge" };
 
@@ -145,12 +145,23 @@ export function EditForm({
     try {
       // Optimitzem cada foto al navegador per no superar el límit de
       // mida de Vercel (~4.5 MB per request).
-      const fitxers = await Promise.all(
-        novesFotos.map((n) => resizeImageFile(n.file))
+      const resultats = await Promise.all(
+        novesFotos.map((n) => resizeImageFileDetallat(n.file))
       );
 
+      const heicNoConvertit = resultats.find(
+        (r) => r.unprocessed && r.esHeic && r.file.size > 3.5 * 1024 * 1024
+      );
+      if (heicNoConvertit) {
+        throw new Error(
+          "Una foto és en format HEIC i és massa gran per pujar-la des d'aquest dispositiu. Al teu iPhone, configura la càmera com a \"Més compatible\" o exporta-la des de Fotos."
+        );
+      }
+
       const fd = new FormData();
-      fitxers.forEach((f) => fd.append("fitxers", f, f.name));
+      resultats
+        .map((r) => r.file)
+        .forEach((f) => fd.append("fitxers", f, f.name));
       const url = `/api/moments/${moment.id}/mitjans${
         codi ? `?codi=${encodeURIComponent(codi)}` : ""
       }`;
